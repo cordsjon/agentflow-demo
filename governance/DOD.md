@@ -9,7 +9,7 @@ An item that fails DOD cannot be deployed. The queue tail enforces this automati
 - [ ] **All new code has tests** — every US has a corresponding test file
 - [ ] **Tests pass** — project's greenlight/test suite 100% green
 - [ ] **No new test failures** — pre-existing failures documented, zero regressions
-- [ ] **Quality audit clean** — `/sc:analyze --focus quality` returns only Low findings (or none)
+- [ ] **Quality audit clean** — `/sc:analyze --focus quality` returns only Low findings (or none). All findings classified using [FIPD taxonomy](KNOWN_PATTERNS.md#fipd-finding-taxonomy) (Fix/Investigate/Plan/Decide) instead of severity-only. Investigate/Decide findings must include an `Unknown:` clause.
 - [ ] **Low findings fixed** — `/sc:cleanup --type all` applied and verified
 
 ### Architecture
@@ -38,12 +38,15 @@ An item that fails DOD cannot be deployed. The queue tail enforces this automati
 ## Enforcement (Mandatory Queue Tail)
 
 ```
-1. /sc:analyze "<changed files>" --focus quality
+1. /sc:analyze "<changed files>" --focus quality    (findings use FIPD classification)
 2. /production-code-audit       (M+ size tasks only — deep security/perf/arch)
 3. /sc:cleanup --type all
 4. /sc:test --coverage          (if new test files)
 5. /commit-smart
 6. deploy                       (project-specific)
 ```
+
+> **FIPD reference:** All finding outputs use Fix/Investigate/Plan/Decide classification.
+> Definitions and uncertainty declaration rules: [KNOWN_PATTERNS.md](KNOWN_PATTERNS.md#fipd-finding-taxonomy)
 
 If any step fails, autopilot pauses and reports the blocker.
