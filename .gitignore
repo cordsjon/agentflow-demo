@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+demo.db
+test.db
+.autopilot
+.claude-action
+.claude-action-log
+.claude-activity
+done/
+*.egg-info/
+dist/
+build/
