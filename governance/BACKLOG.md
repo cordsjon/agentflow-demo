@@ -71,7 +71,7 @@
   - **Test strategy:** Agent acceptance test — read updated KNOWN_PATTERNS, classify a novel finding, verify FIPD + uncertainty output format
   - **Dependencies:** None
   - **Before/After examples:**
-    - KNOWN_PATTERNS row — Before: `| 2 | Catching bare Exception | Catch specific exceptions | SVG-PAINT |` → After: `| 2 | Catching bare Exception | Catch specific exceptions | SVG-PAINT | Fix |`
+    - KNOWN_PATTERNS row — Before: `| 2 | Catching bare Exception | Catch specific exceptions | ProjectA |` → After: `| 2 | Catching bare Exception | Catch specific exceptions | ProjectA | Fix |`
     - Finding output (Fix) — Before: `⚠️ MEDIUM: Unguarded setattr loop in config_service.py:45` → After: `Fix: Unguarded setattr loop in config_service.py:45 · Unknown: whether current PERSISTED_FIELDS whitelist covers all callers`
     - Finding output (Investigate) — `Investigate: Intermittent 500 on /api/collections endpoint · Unknown: whether caused by connection pool exhaustion or upstream timeout`
   - **Spec-panel:** pass 1: 2.9/10 → pass 2: **7.6/10** (gate passed)

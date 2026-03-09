@@ -23,16 +23,16 @@ Every pattern and finding is classified by **action type** — what the reader s
 
 | # | Anti-Pattern | Correct Pattern | Origin | Action |
 |---|-------------|-----------------|--------|--------|
-| 1 | **Evaluating settings at module import time** — value freezes, ignores runtime changes | Use `None` default + resolved method at call time | SVG-PAINT | Fix |
-| 2 | **Catching bare `Exception`** — hides system exits, OOM, permission errors | Catch specific exceptions: `OSError`, `ValueError`, `httpx.HTTPError` | SVG-PAINT | Fix |
-| 3 | **Import-time side effects** (creating semaphores, opening files at module level) | Defer to factory function, `__init__`, or startup handler | SVG-PAINT | Fix |
+| 1 | **Evaluating settings at module import time** — value freezes, ignores runtime changes | Use `None` default + resolved method at call time | — | Fix |
+| 2 | **Catching bare `Exception`** — hides system exits, OOM, permission errors | Catch specific exceptions: `OSError`, `ValueError`, `httpx.HTTPError` | — | Fix |
+| 3 | **Import-time side effects** (creating semaphores, opening files at module level) | Defer to factory function, `__init__`, or startup handler | — | Fix |
 
 ## 2. Data & Sorting
 
 | # | Anti-Pattern | Correct Pattern | Origin | Action |
 |---|-------------|-----------------|--------|--------|
 | 4 | **`dict.get(key, default)` when value can be `None`** — returns `None` not default | Use `dict.get(key) or default` to coerce `None` | Tether | Fix |
-| 5 | **Loading all rows then checking count** against a limit — OOM at scale | Run `SELECT COUNT(*)` first, reject if over limit, then load | SVG-PAINT | Fix |
+| 5 | **Loading all rows then checking count** against a limit — OOM at scale | Run `SELECT COUNT(*)` first, reject if over limit, then load | — | Fix |
 
 ## 3. Process & Infrastructure
 
@@ -40,14 +40,14 @@ Every pattern and finding is classified by **action type** — what the reader s
 |---|-------------|-----------------|--------|--------|
 | 6 | **Bare `python` in scripts** — resolves to wrong venv on PATH | Use explicit venv path: `$TetherRoot\.venv\Scripts\python.exe` | Tether | Fix |
 | 7 | **ngrok free-tier URLs assumed stable** — tunnels expire when process stops | Either use static domain (paid) or document restart procedure | Tether | Decide |
-| 8 | **Semaphore read once at session start** — misses mid-session pause signals | Re-read semaphore file before EVERY loop iteration | SVG-PAINT | Fix |
+| 8 | **Semaphore read once at session start** — misses mid-session pause signals | Re-read semaphore file before EVERY loop iteration | — | Fix |
 
 ## 4. Frontend & CSS
 
 | # | Anti-Pattern | Correct Pattern | Origin | Action |
 |---|-------------|-----------------|--------|--------|
-| 9 | **Hardcoded hex colors** instead of CSS custom properties | Extract to `:root` tokens, reference with `var(--name)` | SVG-PAINT | Fix |
-| 10 | **Hardcoded magic numbers** in JS duplicating Python constants | Read from DOM `data-` attributes set by templates | SVG-PAINT | Fix |
+| 9 | **Hardcoded hex colors** instead of CSS custom properties | Extract to `:root` tokens, reference with `var(--name)` | — | Fix |
+| 10 | **Hardcoded magic numbers** in JS duplicating Python constants | Read from DOM `data-` attributes set by templates | — | Fix |
 
 ## 5. Review & Analysis
 
