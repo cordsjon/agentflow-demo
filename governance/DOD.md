@@ -17,6 +17,9 @@ An item that fails DOD cannot be deployed. The queue tail enforces this automati
 - [ ] **No constraint violations** — checked against project's CLAUDE.md
 - [ ] **Backward compatible** — or all callers updated
 
+### External Writes
+- [ ] **Dry-run before mutation** — any skill that writes to files outside the current task scope (BACKLOG.md, ROADMAP.md, external systems) MUST preview changes before executing. Skills log intended writes to `.claude-action` before applying them. Autopilot: always dry-run external writes first, then execute.
+
 ### Committed
 - [ ] **Clean commit** — descriptive message, atomic scope
 - [ ] **No uncommitted changes** — `git status` clean after commit

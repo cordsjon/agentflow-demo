@@ -349,6 +349,14 @@ Activation path:  STUB ──→ transport verified ──→ first contact
 │  │                                                               │  │
 │  │  Low findings   → auto-fix loop                              │  │
 │  │  Medium+ findings → PAUSE autopilot, human review            │  │
+│  │                                                               │  │
+│  │  Finding Classification (FIPD taxonomy):                      │  │
+│  │  Fix         = root cause known, implement immediately        │  │
+│  │  Investigate = symptom observed, gather data first             │  │
+│  │  Plan        = direction known, needs design work             │  │
+│  │  Decide      = trade-off, escalate to human                   │  │
+│  │  See KNOWN_PATTERNS.md for full definitions + examples.       │  │
+│  │  Investigate/Decide findings require Unknown: clause.         │  │
 │  └───────────────────────────────────────────────────────────────┘  │
 │                              │                                      │
 │                              ▼                                      │
@@ -414,9 +422,22 @@ D:\Temp\git\Governance\
 ├── Gemini.md               ← Gemini/Grok connection playbook
 ├── requirements/
 │   └── REQ_PO_CAPABILITIES.md
-└── templates/
-    └── PROJECT_GOVERNANCE_SNIPPET.md
+├── templates/
+│   └── PROJECT_GOVERNANCE_SNIPPET.md
+└── exports/
+    ├── AgentFlow-Governance-Cheatsheet.pdf  ← 2-page printable cheat sheet
+    └── Governance-Dashboard.xlsx            ← Auto-synced backlog/roadmap
 ```
+
+### Cheat Sheet
+
+A **2-page A4 landscape PDF** covering the entire governance system sequenced by daily workflow:
+
+![AgentFlow Governance Cheat Sheet — Page 1](exports/cheatsheet-page1.png)
+
+**Download:** [AgentFlow-Governance-Cheatsheet.pdf](exports/AgentFlow-Governance-Cheatsheet.pdf)
+
+Sections: Session Start → Triage → Refinement → Planning → Execution → Quality Gate → Completion, plus reference cards for DOR, FIPD, Agent Routing, and File Index.
 
 ### Tools
 
@@ -461,7 +482,20 @@ Features:
     └── DONE-2026-W{NN}.md  ← Weekly archives
 ```
 
-### Sync Status (as of 2026-03-05)
+### Sync Pipeline (as of 2026-03-09)
+
+**4 destinations** via `scripts/sync-repos.ps1` (triggered by post-commit hook or manually):
+
+| # | Destination | What | How |
+|---|-------------|------|-----|
+| 1 | **Local repos** | Copies 9 governance files into `governance/` subfolder | File copy (MD5 hash-check) |
+| 2 | **Public repos** | Copies + commits + pushes to agentflow & agentflow-demo | git pull/add/commit/push |
+| 3 | **Excel** | BACKLOG + ROADMAP as `.xlsx` workbook | COM automation |
+| 4 | **Google Sheets** | Structured data via Tether HTTP API | AppScript bridge |
+
+**Synced files (9):** CLAUDE-LOOP.md, DOR.md, DOD.md, KNOWN_PATTERNS.md, BACKLOG.md, ROADMAP.md, ORCHESTRATOR.md, AGENT_CAPABILITIES.md, GOVERNANCE-GUIDE.md
+
+**Flags:** `-SkipRepos`, `-SkipPublish` (copy only, no commit/push), `-SkipExcel`, `-SkipSheets`, `-Quiet`
 
 ```
 Governance ──→ ProjectA/governance/      [synced]
@@ -584,7 +618,8 @@ User: "Research marketplace SEO trends for product listings"
 | **Hotfix** | A bug that actively blocks development. Fast-tracks from INBOX directly to TODO-Today (skips Ideation/Refining). Requires Bug DOR-lite. |
 | **INBOX** | Raw input queue. Anything the user sends (without `/q` prefix) lands here first. Triaged into BACKLOG. |
 | **Inner Loop** | Autopilot execution cycle: semaphore check → read task → route → DOR → execute → cleanup → commit → done → loop. |
-| **KNOWN_PATTERNS** | Anti-pattern registry. Must be consulted before writing new code. Re-introducing a known pattern is a quality regression. |
+| **FIPD** | Finding taxonomy: Fix / Investigate / Plan / Decide. Every pattern and finding in KNOWN_PATTERNS is classified by action type. Investigate and Decide findings require an `Unknown:` clause declaring what remains unverified. |
+| **KNOWN_PATTERNS** | Anti-pattern registry with FIPD action classification. Must be consulted before writing new code. Re-introducing a known pattern is a quality regression. |
 | **LC-B** | Latent Canonical Binary. Tether's encoding format. 9 tags (NULL through OBJ_END). Never read with raw SQL. |
 | **Orchestrator** | Lightweight routing layer. A phase inside autopilot, not a daemon. Assigns `@agent`, detects stalls, cascades completions. See ORCHESTRATOR.md. |
 | **Outer Loop** | Human-driven queue lifecycle. User/planning populates TODO-Today via `/workflow`. |
