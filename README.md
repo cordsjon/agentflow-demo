@@ -1,13 +1,13 @@
 # agentflow-demo
 
-**Demo repository for [agentflow](https://github.com/cordsjon/agentflow)** — a boilerplate FastAPI app with pre-filled pipeline stages for recording workflow demos.
+**Demo repository for [Shepherd](https://github.com/cordsjon/agentflow)** — a boilerplate FastAPI app with pre-filled pipeline stages for recording workflow demos.
 
 ## What's Inside
 
 A minimal task management API with realistic pipeline state at every stage — INBOX items waiting for triage, BACKLOG items in Ideation/Refining/Ready, a TODO-Today queue mid-execution, and completed items in DONE-Today.
 
 Use this repo to:
-- **Record demo videos** of the agentflow loop in action
+- **Record demo videos** of the Shepherd loop in action
 - **Test governance tooling** (Remote Control, Pipeline Dashboard) against real pipeline state
 - **Onboard new users** with a working example they can run immediately
 
@@ -20,8 +20,8 @@ cd agentflow-demo
 
 # 2. Set up
 python -m venv .venv
-.venv/Scripts/activate     # Windows
-# source .venv/bin/activate  # macOS/Linux
+source .venv/bin/activate  # macOS/Linux
+# .venv\Scripts\activate   # Windows
 pip install -r requirements.txt
 
 # 3. Run
@@ -46,23 +46,23 @@ python -m uvicorn app.main:app --reload --port 8000
 
 ### Sequence 1: Triage (INBOX → BACKLOG)
 1. Open `INBOX.md` — 4 untriaged items
-2. Run `/triage` — classify each item
+2. Run `/sh:triage` — classify each item
 3. Watch items move to `BACKLOG.md` appropriate stages
 
 ### Sequence 2: Graduation (BACKLOG → Ready)
 1. Show BACKLOG with items in Ideation, Refining, Ready
-2. Run `/sc:brainstorm` on an Ideation item → moves to Refining
-3. Run `/requirements-clarity` + `/sc:spec-panel` → score >= 7.0 → moves to Ready
+2. Run `/sh:brainstorm` on an Ideation item → moves to Refining
+3. Run `/sh:spec-review` + `/sh:spec-panel` → score >= 7.0 → moves to Ready
 
 ### Sequence 3: Queue Execution (autopilot loop)
 1. Show `TODO-Today.md` with 4 unchecked items
-2. Start `/autopilot` — agent picks first unchecked
+2. Start `/sh:autopilot` — agent picks first unchecked
 3. Watch the 14-step inner loop: TDD → implement → verify → review → cleanup → commit
 4. Item gets checked, next item picked up
 
 ### Sequence 4: Quality Gate (cleanup sub-loop)
 1. Implementation completes
-2. `/sc:analyze` runs — finds 2 Low, 1 Medium issue
+2. `/sh:analyze` runs — finds 2 Low, 1 Medium issue
 3. Low issues auto-fixed in cleanup loop
 4. Medium issue → autopilot pauses → human review
 
@@ -70,7 +70,7 @@ python -m uvicorn app.main:app --reload --port 8000
 1. Queue nearly empty (1 item left)
 2. System suggests planning round
 3. Scan INBOX, check staleness, review risks
-4. `/sc:workflow` generates new queue from Ready items
+4. `/sh:workflow` generates new queue from Ready items
 
 ## Project Structure
 
@@ -84,7 +84,7 @@ agentflow-demo/
 │       └── index.html       # Minimal UI
 ├── tests/
 │   └── test_tasks.py        # Example test file
-├── governance/              # ← Synced from agentflow
+├── governance/              # ← Synced from Shepherd repo
 │   ├── CLAUDE-LOOP.md
 │   ├── DOD.md
 │   ├── DOR.md
@@ -101,7 +101,7 @@ agentflow-demo/
 
 ## Governance
 
-This demo uses [agentflow](https://github.com/cordsjon/agentflow) governance. The `governance/` directory is synced from the agentflow repo.
+This demo uses [Shepherd](https://github.com/cordsjon/agentflow) governance. The `governance/` directory is synced from the Shepherd repo. All 34 `/sh:` commands are available.
 
 ## License
 
