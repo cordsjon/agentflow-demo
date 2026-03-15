@@ -40,8 +40,8 @@
            ┌──────────┬──────────┬────────┴────────┬──────────┐
            │          │          │                  │          │
       ┌────┴────┐ ┌───┴───┐ ┌───┴────┐ ┌──────────┴┐ ┌──────┴───┐
-      │SVG-PAINT│ │Tether │ │Sidequest│ │Whitelabel │ │ Skills   │
-      │ :9001   │ │ :7890 │ │        │ │           │ │          │
+      │ProjectA │ │Tether │ │ProjectB│ │ProjectC   │ │ProjectD  │
+      │         │ │ :7890 │ │        │ │           │ │          │
       └─────────┘ └───────┘ └────────┘ └───────────┘ └──────────┘
            │          │
            │    Tether Message Bus
@@ -303,7 +303,7 @@ USER INPUT (any message without /q prefix)
 │ @gemini  │ STUB     │ Google Sheets bridge           │ Research      │
 │          │          │ Tether HTTP API                │ Large-context │
 │          │          │ (2min polling)                 │ Spec review   │
-│          │          │                               │ SEO/Etsy      │
+│          │          │                               │ SEO/Market    │
 ├──────────┼──────────┼───────────────────────────────┼───────────────┤
 │ @chatgpt │ STUB     │ Google Sheets bridge           │ Copywriting   │
 │          │          │ Manual paste                   │ Marketing     │
@@ -498,10 +498,11 @@ Features:
 **Flags:** `-SkipRepos`, `-SkipPublish` (copy only, no commit/push), `-SkipExcel`, `-SkipSheets`, `-Quiet`
 
 ```
-Governance ──→ SVG-PAINT/governance/     [synced - local]
-           ──→ Tether/governance/        [synced - local]
-           ──→ agentflow/ (root)         [synced - publish]
-           ──→ agentflow-demo/governance [synced - publish]
+Governance ──→ ProjectA/governance/      [synced]
+           ──→ Tether/governance/        [synced]
+           ──→ ProjectB/governance/      [synced]
+           ──→ ProjectC/governance/      [synced]
+           ──→ ProjectD/governance/      [synced]
 ```
 
 ---
@@ -511,24 +512,24 @@ Governance ──→ SVG-PAINT/governance/     [synced - local]
 ### Example A: Bug Fix (fast track)
 
 ```
-User: "The font preview crashes when the font has no glyphs"
+User: "The data export crashes when the dataset is empty"
 
 1. TRIAGE
    ├── Classify: [bug]
    ├── Severity: blocks development → [hotfix]
    └── Write to TODO-Today.md (skips BACKLOG):
-       - [ ] **fix** Font preview crash on empty glyph set `@claude` `stall:0`
-         `/sc:implement "fix empty glyph crash" --focus backend`
-         _Context: font_detail.html, font_service.py -- confidence:1.0_
+       - [ ] **fix** Data export crash on empty dataset `@claude` `stall:0`
+         `/sc:implement "fix empty dataset crash" --focus backend`
+         _Context: export_service.py -- confidence:1.0_
 
 2. ROUTE
    ├── Only @claude is active → assign @claude, confidence: 1.0
-   └── Bug DOR-lite: root cause = missing guard, fix = 1 step, test = test_font_preview
+   └── Bug DOR-lite: root cause = missing guard, fix = 1 step, test = test_export
 
 3. EXECUTE
-   ├── Read font_service.py
-   ├── Add guard: if not glyphs: return empty preview
-   ├── Write test_font_preview_empty.py
+   ├── Read export_service.py
+   ├── Add guard: if not dataset: return empty result
+   ├── Write test_export_empty.py
    └── Run greenlight
 
 4. CLEANUP SUB-LOOP
@@ -536,8 +537,8 @@ User: "The font preview crashes when the font has no glyphs"
    └── Continue
 
 5. COMMIT + DONE
-   ├── git commit -m "fix: guard against empty glyph set in font preview"
-   ├── queue done --task "Font preview crash on empty glyph set"
+   ├── git commit -m "fix: guard against empty dataset in export"
+   ├── queue done --task "Data export crash on empty dataset"
    └── Update KNOWN_PATTERNS if pattern is reusable
 ```
 
@@ -576,14 +577,14 @@ User: "We need recipe categories to support 3-level nesting"
 ### Example C: Research Task (future multi-agent)
 
 ```
-User: "Research Etsy SEO trends for contrast card listings"
+User: "Research marketplace SEO trends for product listings"
 
 1. TRIAGE → BACKLOG.md#Ideation → [research]
 
 2. ROUTE (when @gemini is active)
    ├── Score @claude:  -2 (no web browsing match)
    ├── Score @gemini:   6 (research + SEO + trends + web)
-   ├── Score @chatgpt:  4 (Etsy + listings + web)
+   ├── Score @chatgpt:  4 (marketplace + listings + web)
    └── Route: @gemini, confidence: 0.75
 
 3. DISPATCH via Tether
@@ -613,7 +614,7 @@ User: "Research Etsy SEO trends for contrast card listings"
 | **DOR-lite** | Lightweight gate for bugs/hotfixes. Root cause + fix plan + regression test + constraints + estimate. |
 | **DONE-Today** | Completion log with timestamps. Auto-archives to `done/DONE-{YYYY}-W{WW}.md` at 200 lines. |
 | **Graduation** | Moving an item from one pipeline stage to the next. Each graduation has a gate command. |
-| **Greenlight** | Project-specific test/quality suite. Must be 100% green before any commit. SVG-PAINT: `python -m app.cli.main greenlight --all`. |
+| **Greenlight** | Project-specific test/quality suite. Must be 100% green before any commit. |
 | **Hotfix** | A bug that actively blocks development. Fast-tracks from INBOX directly to TODO-Today (skips Ideation/Refining). Requires Bug DOR-lite. |
 | **INBOX** | Raw input queue. Anything the user sends (without `/q` prefix) lands here first. Triaged into BACKLOG. |
 | **Inner Loop** | Autopilot execution cycle: semaphore check → read task → route → DOR → execute → cleanup → commit → done → loop. |
@@ -786,7 +787,7 @@ Skills outside the dev loop are organized into **4 support processes**. Each has
 
 ### SP-4: Content Production Desk
 
-**Trigger:** Etsy listing creation, blog/docs needed, or content calendar milestone.
+**Trigger:** Marketplace listing creation, blog/docs needed, or content calendar milestone.
 **Cadence:** Per-listing or weekly content batch.
 **Owner:** User-initiated.
 
@@ -794,7 +795,7 @@ Skills outside the dev loop are organized into **4 support processes**. Each has
 /content-creator               → SEO-optimized marketing content
 /content-research-writer       → research-backed articles with citations
 /viral-generator-builder       → shareable tool builders
-/shopify-development           → Shopify integration (if expanding beyond Etsy)
+/shopify-development           → Shopify integration
 ```
 
 **Workflow:**
@@ -802,6 +803,30 @@ Skills outside the dev loop are organized into **4 support processes**. Each has
 2. `/content-research-writer` produces draft
 3. `/content-creator` optimizes for SEO
 4. `/copy-editing` polishes final version
+
+### SP-5: Lightsout Hygiene
+
+**Trigger:** Queue empty (autopilot end-of-day), planning round, or on-demand.
+**Cadence:** Daily (if autopilot active) or weekly minimum.
+**Owner:** Autopilot-triggered or user-initiated.
+
+```
+/health                        → pipeline staleness + velocity snapshot
+/backlog-grooming              → archive shipped items, flag stale/orphans, cleanup fixes
+/session-handoff               → save context for next session
+```
+
+**Workflow:**
+1. Queue drains (step 14 of inner loop) → lightsout chain fires automatically
+2. `/health` produces read-only pipeline snapshot
+3. `/backlog-grooming` archives shipped items, flags stale/orphans, applies cleanup fixes
+4. `/session-handoff` captures session context
+
+**Key behaviors:**
+- Idempotent — running twice produces no additional changes
+- `--dry-run` available for scan-only mode (no file modifications)
+- Never modifies active items or priorities — only touches shipped/resolved items
+- Stale/orphan findings surfaced for human decision in next session
 
 ### On-Demand Toolbox (no process — invoke directly)
 
