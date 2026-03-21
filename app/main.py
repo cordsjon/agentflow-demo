@@ -32,18 +32,25 @@ def index():
 
 @app.get("/api/health")
 def health(session: Session = Depends(get_db)):
-    count = len(session.exec(select(Task)).all())
-    return {"status": "ok", "tasks": count}
+    try:
+        count = len(session.exec(select(Task)).all())
+        return {"status": "ok", "tasks": count}
+    except Exception:
+        return {"status": "degraded", "tasks": 0, "error": "database unavailable"}
 
 
 @app.get("/api/tasks", response_model=list[TaskRead])
 def list_tasks(
     status: str | None = None,
+    sort_by: str = "priority",
+    sort_dir: str = "asc",
     limit: int = 50,
     session: Session = Depends(get_db),
 ):
     svc = TaskService(session)
-    return svc.list_tasks(status=status, limit=min(limit, 200))
+    return svc.list_tasks(
+        status=status, sort_by=sort_by, sort_dir=sort_dir, limit=min(limit, 200)
+    )
 
 
 @app.post("/api/tasks", response_model=TaskRead, status_code=201)

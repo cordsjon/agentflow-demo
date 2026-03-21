@@ -1,6 +1,6 @@
 """Service layer — business logic lives here, not in route handlers."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlmodel import Session, select
 
@@ -13,8 +13,20 @@ class TaskService:
     def __init__(self, session: Session):
         self._session = session
 
-    def list_tasks(self, status: str | None = None, limit: int = 50) -> list[Task]:
-        stmt = select(Task).order_by(Task.priority)
+    SORTABLE_COLUMNS = {"priority", "created_at", "title", "status"}
+
+    def list_tasks(
+        self,
+        status: str | None = None,
+        sort_by: str = "priority",
+        sort_dir: str = "asc",
+        limit: int = 50,
+    ) -> list[Task]:
+        col = sort_by if sort_by in self.SORTABLE_COLUMNS else "priority"
+        order_col = getattr(Task, col)
+        if sort_dir == "desc":
+            order_col = order_col.desc()
+        stmt = select(Task).order_by(order_col)
         if status:
             stmt = stmt.where(Task.status == status)
         return list(self._session.exec(stmt.limit(limit)).all())
@@ -35,7 +47,7 @@ class TaskService:
             return None
         for key, val in data.model_dump(exclude_unset=True).items():
             setattr(task, key, val)
-        task.updated_at = datetime.utcnow()
+        task.updated_at = datetime.now(UTC)
         self._session.add(task)
         self._session.commit()
         self._session.refresh(task)

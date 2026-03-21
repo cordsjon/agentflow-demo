@@ -26,6 +26,10 @@
     .health--err { background: rgba(248, 81, 73, 0.15); color: var(--red); }
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
+    .sort-bar { display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1.25rem; font-size: 0.8rem; color: var(--muted); }
+    .sort-bar select { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; font-size: 0.8rem; }
+    .sort-bar button { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 0.8rem; }
+    .sort-bar button:hover { border-color: var(--accent); }
     .footer { margin-top: 2rem; color: var(--muted); font-size: 0.8rem; }
   </style>
 </head>
@@ -35,6 +39,17 @@
     Minimal task manager for <a href="https://github.com/cordsjon/agentflow">agentflow</a> governance demos
     <span class="health" id="health"></span>
   </p>
+
+  <div class="sort-bar">
+    Sort by:
+    <select id="sort-by">
+      <option value="priority">Priority</option>
+      <option value="created_at">Created</option>
+      <option value="title">Title</option>
+      <option value="status">Status</option>
+    </select>
+    <button id="sort-dir" title="Toggle sort direction">Asc ↑</button>
+  </div>
 
   <div class="grid">
     <div class="card">
@@ -58,6 +73,9 @@
   </p>
 
   <script>
+    let sortBy = 'priority';
+    let sortDir = 'asc';
+
     async function load() {
       try {
         const health = await fetch('/api/health').then(r => r.json());
@@ -68,7 +86,7 @@
         document.getElementById('health').className = 'health health--err';
       }
 
-      const tasks = await fetch('/api/tasks').then(r => r.json());
+      const tasks = await fetch(`/api/tasks?sort_by=${sortBy}&sort_dir=${sortDir}`).then(r => r.json());
       const groups = { todo: [], in_progress: [], done: [] };
       tasks.forEach(t => (groups[t.status] || groups.todo).push(t));
 
@@ -83,6 +101,17 @@
         `<div class="task"><span class="task-title">${t.title}</span><span class="task-priority">#${t.priority}</span></div>`
       ).join('');
     }
+
+    document.getElementById('sort-by').addEventListener('change', e => {
+      sortBy = e.target.value;
+      load();
+    });
+
+    document.getElementById('sort-dir').addEventListener('click', e => {
+      sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+      e.target.textContent = sortDir === 'asc' ? 'Asc ↑' : 'Desc ↓';
+      load();
+    });
 
     load();
   </script>
