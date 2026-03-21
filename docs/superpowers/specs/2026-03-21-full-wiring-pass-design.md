@@ -10,6 +10,8 @@
 
 ## 1. Problem Statement
 
+**System boundary:** single-user local app, no authentication, no external API integrations, SQLite file database. All changes within `app/` directory.
+
 The agentflow-demo backend is feature-complete (5 CRUD operations, health endpoint, tag list) with 28 passing tests, but the frontend is read-only. Four of five CRUD operations are unreachable from the browser. The tag system is a stub (model + seed data, no service, no UI, no task-tag relationship). Three API response fields (description, created_at, updated_at) are returned but never rendered.
 
 ### Wiring Gaps Identified
@@ -30,9 +32,10 @@ The agentflow-demo backend is feature-complete (5 CRUD operations, health endpoi
 3. Task description, created_at, updated_at are visible in a detail view
 4. Tag filtering works end-to-end (API param → UI dropdown → filtered results)
 5. All existing 28 tests pass unchanged
-6. 15+ new tests covering tag CRUD, task-tag assignment, tag filtering, cascade delete
+6. 18 new tests covering tag CRUD, task-tag assignment, tag filtering, cascade delete
 7. No new packages added (CLAUDE.md constraint)
 8. Service-first pattern maintained (CLAUDE.md constraint)
+9. Detail panel, toasts, and inline edit meet keyboard/screen-reader accessibility requirements (Section 6)
 
 ---
 
@@ -43,8 +46,8 @@ The agentflow-demo backend is feature-complete (5 CRUD operations, health endpoi
 ```python
 class TaskTag(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
-    task_id: int = Field(foreign_key="task.id", index=True)
-    tag_id: int = Field(foreign_key="tag.id", index=True)
+    task_id: int = Field(foreign_key="task.id", index=True, ondelete="CASCADE")
+    tag_id: int = Field(foreign_key="tag.id", index=True, ondelete="CASCADE")
 
     class Config:
         table_args = (UniqueConstraint("task_id", "tag_id"),)
@@ -61,7 +64,7 @@ tags: list["Tag"] = Relationship(back_populates="tasks", link_model=TaskTag)
 
 **Tag model** — add relationship:
 ```python
-tags: list["Task"] = Relationship(back_populates="tags", link_model=TaskTag)
+tasks: list["Task"] = Relationship(back_populates="tags", link_model=TaskTag)
 ```
 
 **TaskRead** — add tags field:
@@ -139,16 +142,15 @@ class TagService:
 - `update_task(task_id: int, data: TaskUpdate) -> Task | None`
   - If `tag_ids` is not None, delete existing TaskTag rows for this task, create new ones
   - Set-replace semantics: `tag_ids=[]` clears all tags, `tag_ids=None` leaves unchanged
+  - Example: Task has tags ["bug","feature"]. PATCH with `{"title":"X"}` (no tag_ids) → tags unchanged. PATCH with `{"tag_ids":[]}` → tags cleared. PATCH with `{"tag_ids":[3]}` → tags become ["refactor"].
 
 - `list_tasks(status, sort_by, sort_dir, limit, tag) -> list[Task]`
   - Add optional `tag: str | None` parameter
   - When set, join through TaskTag + Tag to filter tasks that have the named tag
 
-**New helper:**
+**Response mapping:**
 
-- `_get_task_with_tags(task: Task) -> dict`
-  - Converts Task to dict with `tags: list[str]` populated from relationship
-  - Used by all methods that return TaskRead
+- `TaskRead` gains a `@classmethod from_task(cls, task: Task) -> TaskRead` factory that reads `task.tags` relationship and maps tag names to `list[str]`. All route handlers use this factory (or `model_validate`) instead of returning raw Task objects — ensures `response_model=TaskRead` validation works correctly.
 
 ---
 
@@ -167,7 +169,7 @@ class TagService:
 
 | Route | Method | Purpose |
 |-------|--------|---------|
-| `POST /api/tags` | create_tag | Create a new tag. Body: `{"name": "string"}`. Returns `TagRead`, 201. |
+| `POST /api/tags` | create_tag | Create a new tag. Body: `{"name": "string"}`. Returns `TagRead`, 201. Returns 409 if name already exists. |
 | `DELETE /api/tags/{tag_id}` | delete_tag | Delete tag + cascade TaskTag rows. Returns 204. 404 if not found. |
 
 ### 5.3 Response Format Change
@@ -194,17 +196,20 @@ All changes are inline in `app/templates/index.html`. No new files, no new packa
 
 ### 6.1 Create Form (Quick Win)
 
-- Collapsible panel above the task board, toggled by a "+ New Task" button
-- Fields: title (text, required), description (textarea), priority (number, default 0)
-- Tag assignment: checkbox list populated from `GET /api/tags`
+- Collapsible panel above the task board, toggled by a prominent "+ New Task" button (accent color `var(--accent)`, always visible, never hidden behind overflow)
+- Fields: title (text, required), description (textarea, behind "More options" disclosure), priority (number, default 0)
+- Tag assignment: checkbox list populated from `GET /api/tags` (inside "More options")
 - Submit → `POST /api/tasks` with JSON body → refresh board → collapse form
 - Cancel button to dismiss without creating
+- **Keyboard:** Enter in title field submits (if title non-empty), Escape cancels and collapses
 
 ### 6.2 Delete Button (Quick Win)
 
 - Small `x` button on each task card (right side, next to priority badge)
-- Click → browser `confirm("Delete this task?")` → `DELETE /api/tasks/{id}` → refresh board
+- Click → inline confirmation: button transforms to "Confirm? Yes / No" for 3 seconds → reverts if no action (no browser `confirm()` — stays within UI language)
+- `aria-label="Delete task: {title}"` for screen reader users
 - Styled subtle (muted color) to avoid visual clutter
+- **Keyboard:** Focusable via Tab, activated via Enter/Space
 
 ### 6.3 Status Filter Dropdown (Quick Win)
 
@@ -214,19 +219,21 @@ All changes are inline in `app/templates/index.html`. No new files, no new packa
 
 ### 6.4 Task Detail Panel
 
-- Click on task title → opens a slide-in panel (right side) or modal overlay
+- Click on task title → opens a slide-in panel (right side)
 - Shows all fields: title, description (or "No description" placeholder), status, priority, created_at, updated_at
 - Timestamps displayed as relative time ("2h ago") with full datetime on hover (title attribute)
 - Tag chips displayed as colored pills
-- Inline edit: click title/description/priority to edit in place, save on blur or Enter
-- Status toggle: clickable badge that cycles todo → in_progress → done
+- **Inline edit:** editable fields show a subtle pencil icon on hover as affordance cue. Click or press Enter/Space to activate edit mode. Enter to save, Escape to cancel. State changes announced via `aria-live="polite"` region.
+- **Status selector:** `<select>` dropdown (not a cycle toggle) — shows all three options, supports any transition, no hidden state machine
 - Tag edit: checkbox picker matching the create form
 - Close button to dismiss panel
+- **Accessibility:** `role="dialog"`, `aria-modal="true"`, focus trap (Tab cycles within panel), Escape to close, focus returns to the task title that triggered the panel
+- **Mobile:** renders as full-screen overlay on viewports below 640px
 
 ### 6.5 Tag Chips on Task Cards
 
 - After the task title, render small colored pills for each tag
-- Colors assigned deterministically from tag name hash (consistent across renders)
+- Colors assigned from a fixed palette of 8 curated colors (good contrast on dark bg), selected via `hash(name) % 8` — guarantees visual harmony and accessibility
 - Max 3 visible + "+N" overflow indicator if more than 3 tags
 
 ### 6.6 Tag Filter Dropdown
@@ -238,9 +245,10 @@ All changes are inline in `app/templates/index.html`. No new files, no new packa
 ### 6.7 Toast Notifications
 
 - Fixed-position container (top-right)
-- Auto-dismissing after 3 seconds
+- Auto-dismissing after 5 seconds, with a dismiss `x` button for immediate removal
+- `role="status"` and `aria-live="polite"` on container so screen readers announce messages
 - Green for success ("Task created", "Task deleted"), red for errors
-- Pure CSS animation (slide in, fade out)
+- Pure CSS animation (slide in, fade out) — respects `prefers-reduced-motion: reduce`
 - No library required
 
 ### 6.8 Visual Design
@@ -249,7 +257,10 @@ All changes are inline in `app/templates/index.html`. No new files, no new packa
 - Dark theme consistent with current surface/border/accent colors
 - Form inputs match existing sort-bar select styling
 - Detail panel uses `var(--surface)` background with `var(--border)` edges
-- Tag chips: `border-radius: 12px`, small font, deterministic background colors
+- Tag chips: `border-radius: 12px`, small font, fixed 8-color palette
+- New component CSS classes: `.panel`, `.toast`, `.chip`, `.form-field`, `.confirm-inline` — structured naming even in single-file app
+- **Sort bar layout:** two visual groups separated by spacing — "Sort: [field] [dir]" | "Filter: [status] [tag]"
+- **Responsive:** create form full-width on mobile, detail panel full-screen below 640px, filter controls collapse behind a "Filters" toggle on small screens
 
 ---
 
