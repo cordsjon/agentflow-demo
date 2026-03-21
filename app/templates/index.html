@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>agentflow-demo</title>
   <style>
-    :root { --bg: #0d1117; --surface: #161b22; --border: #30363d; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --green: #3fb950; --red: #f85149; --yellow: #d29922; }
+    :root { --bg: #0d1117; --surface: #161b22; --border: #30363d; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --green: #3fb950; --red: #f85149; --yellow: #d29922; --overlay: rgba(0,0,0,0.6); }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); padding: 2rem; }
     h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
-    .subtitle { color: var(--muted); margin-bottom: 2rem; }
+    .subtitle { color: var(--muted); margin-bottom: 1.25rem; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
     .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
     .card h2 { font-size: 1rem; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
@@ -17,19 +17,97 @@
     .badge--todo { background: var(--yellow); color: #000; }
     .badge--progress { background: var(--accent); color: #000; }
     .badge--done { background: var(--green); color: #000; }
-    .task { padding: 0.5rem 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .task { padding: 0.5rem 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
     .task:last-child { border-bottom: none; }
-    .task-title { font-size: 0.875rem; }
+    .task-left { display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 0; }
+    .task-title { font-size: 0.875rem; cursor: pointer; color: var(--accent); text-decoration: none; }
+    .task-title:hover { text-decoration: underline; }
+    .task-right { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
     .task-priority { color: var(--muted); font-size: 0.75rem; }
     .health { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.75rem; border-radius: 16px; font-size: 0.8rem; }
     .health--ok { background: rgba(63, 185, 80, 0.15); color: var(--green); }
     .health--err { background: rgba(248, 81, 73, 0.15); color: var(--red); }
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
-    .sort-bar { display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1.25rem; font-size: 0.8rem; color: var(--muted); }
-    .sort-bar select { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; font-size: 0.8rem; }
-    .sort-bar button { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 0.8rem; }
-    .sort-bar button:hover { border-color: var(--accent); }
+
+    /* Sort & Filter bar */
+    .toolbar { display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1.25rem; font-size: 0.8rem; color: var(--muted); flex-wrap: wrap; }
+    .toolbar-group { display: flex; gap: 0.5rem; align-items: center; }
+    .toolbar-sep { width: 1px; height: 20px; background: var(--border); margin: 0 0.25rem; }
+    .toolbar select, .toolbar button { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; font-size: 0.8rem; cursor: pointer; }
+    .toolbar button:hover, .toolbar select:hover { border-color: var(--accent); }
+
+    /* Create button */
+    .btn-create { background: var(--accent); color: #000; font-weight: 600; border: none; border-radius: 6px; padding: 6px 14px; font-size: 0.85rem; cursor: pointer; }
+    .btn-create:hover { opacity: 0.9; }
+
+    /* Create form */
+    .form-field { margin-bottom: 0.75rem; }
+    .form-field label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 4px; }
+    .form-field input, .form-field textarea { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 8px; font-size: 0.85rem; font-family: inherit; }
+    .form-field textarea { resize: vertical; min-height: 60px; }
+    .form-actions { display: flex; gap: 0.5rem; }
+    .form-actions button { padding: 6px 14px; border-radius: 6px; font-size: 0.85rem; cursor: pointer; border: 1px solid var(--border); }
+    .btn-submit { background: var(--accent); color: #000; font-weight: 600; border: none; }
+    .btn-cancel { background: var(--surface); color: var(--text); }
+    .create-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 1.25rem; display: none; }
+    .create-panel.open { display: block; }
+    .more-options { font-size: 0.8rem; color: var(--accent); cursor: pointer; margin-bottom: 0.75rem; display: inline-block; }
+    .more-options-body { display: none; }
+    .more-options-body.open { display: block; }
+    .tag-checkboxes { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .tag-checkboxes label { font-size: 0.8rem; display: flex; align-items: center; gap: 4px; cursor: pointer; }
+
+    /* Tag chips */
+    .chip { display: inline-block; font-size: 0.65rem; padding: 1px 7px; border-radius: 12px; font-weight: 600; margin-right: 3px; }
+    .chip-overflow { font-size: 0.65rem; color: var(--muted); }
+
+    /* Delete button */
+    .btn-delete { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.8rem; padding: 2px 6px; border-radius: 4px; line-height: 1; }
+    .btn-delete:hover { color: var(--red); background: rgba(248,81,73,0.1); }
+    .confirm-inline { display: inline-flex; gap: 4px; font-size: 0.75rem; }
+    .confirm-inline button { font-size: 0.75rem; padding: 1px 8px; border-radius: 4px; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+    .confirm-inline .btn-yes { color: var(--red); border-color: var(--red); }
+
+    /* Detail panel */
+    .panel-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--overlay); z-index: 100; display: none; }
+    .panel-overlay.open { display: flex; justify-content: flex-end; }
+    .panel { width: 400px; max-width: 100%; height: 100%; background: var(--surface); border-left: 1px solid var(--border); padding: 1.5rem; overflow-y: auto; }
+    .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .panel-close { background: none; border: none; color: var(--muted); font-size: 1.5rem; cursor: pointer; padding: 0 4px; }
+    .panel-close:hover { color: var(--text); }
+    .panel-field { margin-bottom: 1rem; }
+    .panel-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; margin-bottom: 4px; }
+    .panel-value { font-size: 0.9rem; }
+    .panel-value.editable { cursor: pointer; padding: 4px 6px; border-radius: 4px; border: 1px solid transparent; }
+    .panel-value.editable:hover { border-color: var(--border); }
+    .panel-value.editable::after { content: ' \270E'; color: var(--muted); font-size: 0.75rem; }
+    .panel-input { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--accent); border-radius: 4px; padding: 4px 6px; font-size: 0.9rem; font-family: inherit; }
+    .panel-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+    .panel-timestamp { font-size: 0.8rem; color: var(--muted); }
+    .panel-status select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; font-size: 0.85rem; }
+
+    /* Toast notifications */
+    .toast-container { position: fixed; top: 1rem; right: 1rem; z-index: 200; display: flex; flex-direction: column; gap: 0.5rem; }
+    .toast { padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem; animation: toast-in 0.3s ease; }
+    .toast-success { background: rgba(63,185,80,0.15); color: var(--green); border: 1px solid rgba(63,185,80,0.3); }
+    .toast-error { background: rgba(248,81,73,0.15); color: var(--red); border: 1px solid rgba(248,81,73,0.3); }
+    .toast-dismiss { background: none; border: none; color: inherit; cursor: pointer; font-size: 1rem; padding: 0 2px; opacity: 0.7; }
+    .toast-dismiss:hover { opacity: 1; }
+    @keyframes toast-in { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes toast-out { from { opacity: 1; } to { opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) {
+      .toast { animation: none; }
+    }
+
+    /* Responsive */
+    @media (max-width: 640px) {
+      body { padding: 1rem; }
+      .panel { width: 100%; border-left: none; }
+      .toolbar { flex-direction: column; align-items: flex-start; }
+      .toolbar-sep { display: none; }
+    }
+
     .footer { margin-top: 2rem; color: var(--muted); font-size: 0.8rem; }
   </style>
 </head>
@@ -40,17 +118,64 @@
     <span class="health" id="health"></span>
   </p>
 
-  <div class="sort-bar">
-    Sort by:
-    <select id="sort-by">
-      <option value="priority">Priority</option>
-      <option value="created_at">Created</option>
-      <option value="title">Title</option>
-      <option value="status">Status</option>
-    </select>
-    <button id="sort-dir" title="Toggle sort direction">Asc ↑</button>
+  <!-- Create button -->
+  <button class="btn-create" id="btn-new-task" onclick="toggleCreate()">+ New Task</button>
+
+  <!-- Create form panel -->
+  <div class="create-panel" id="create-panel" role="region" aria-label="Create new task">
+    <div class="form-field">
+      <label for="new-title">Title *</label>
+      <input type="text" id="new-title" placeholder="Task title" maxlength="200">
+    </div>
+    <span class="more-options" id="more-options-toggle" onclick="toggleMoreOptions()">More options &#9662;</span>
+    <div class="more-options-body" id="more-options-body">
+      <div class="form-field">
+        <label for="new-desc">Description</label>
+        <textarea id="new-desc" placeholder="Optional description"></textarea>
+      </div>
+      <div class="form-field">
+        <label for="new-priority">Priority</label>
+        <input type="number" id="new-priority" value="0" min="0">
+      </div>
+      <div class="form-field">
+        <label>Tags</label>
+        <div class="tag-checkboxes" id="create-tags"></div>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-submit" onclick="submitCreate()">Create</button>
+      <button class="btn-cancel" onclick="toggleCreate()">Cancel</button>
+    </div>
   </div>
 
+  <!-- Toolbar: Sort + Filter -->
+  <div class="toolbar">
+    <div class="toolbar-group">
+      Sort:
+      <select id="sort-by">
+        <option value="priority">Priority</option>
+        <option value="created_at">Created</option>
+        <option value="title">Title</option>
+        <option value="status">Status</option>
+      </select>
+      <button id="sort-dir" title="Toggle sort direction">Asc &#8593;</button>
+    </div>
+    <div class="toolbar-sep"></div>
+    <div class="toolbar-group">
+      Filter:
+      <select id="filter-status">
+        <option value="">All Status</option>
+        <option value="todo">To Do</option>
+        <option value="in_progress">In Progress</option>
+        <option value="done">Done</option>
+      </select>
+      <select id="filter-tag">
+        <option value="">All Tags</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Task board -->
   <div class="grid">
     <div class="card">
       <h2>To Do <span class="badge badge--todo" id="todo-count">0</span></h2>
@@ -66,6 +191,20 @@
     </div>
   </div>
 
+  <!-- Detail panel overlay -->
+  <div class="panel-overlay" id="panel-overlay" role="dialog" aria-modal="true" aria-label="Task detail">
+    <div class="panel" id="detail-panel">
+      <div class="panel-header">
+        <strong>Task Detail</strong>
+        <button class="panel-close" id="panel-close" aria-label="Close panel">&times;</button>
+      </div>
+      <div id="panel-body"></div>
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div class="toast-container" id="toast-container" role="status" aria-live="polite"></div>
+
   <p class="footer">
     API docs: <a href="/docs">/docs</a> &middot;
     Health: <a href="/api/health">/api/health</a> &middot;
@@ -73,10 +212,84 @@
   </p>
 
   <script>
+    // ── State ──────────────────────────────────────────────────────────────
     let sortBy = 'priority';
     let sortDir = 'asc';
+    let filterStatus = '';
+    let filterTag = '';
+    let allTags = [];
+    let allTasks = [];
+    let openTaskId = null;
+    let lastFocusTrigger = null;
+
+    const CHIP_COLORS = [
+      '#58a6ff', '#d2a8ff', '#7ee787', '#f0883e',
+      '#f778ba', '#79c0ff', '#ffa657', '#a5d6ff'
+    ];
+
+    function chipColor(name) {
+      let h = 0;
+      for (let i = 0; i < name.length; i++) h = ((h << 5) - h + name.charCodeAt(i)) | 0;
+      return CHIP_COLORS[Math.abs(h) % CHIP_COLORS.length];
+    }
+
+    function relTime(iso) {
+      const d = new Date(iso);
+      const diff = (Date.now() - d.getTime()) / 1000;
+      if (diff < 60) return 'just now';
+      if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+      if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+      return Math.floor(diff / 86400) + 'd ago';
+    }
+
+    // ── Toast ──────────────────────────────────────────────────────────────
+    function toast(msg, type = 'success') {
+      const c = document.getElementById('toast-container');
+      const el = document.createElement('div');
+      el.className = `toast toast-${type}`;
+      el.innerHTML = `<span>${msg}</span><button class="toast-dismiss" onclick="this.parentElement.remove()" aria-label="Dismiss">&times;</button>`;
+      c.appendChild(el);
+      setTimeout(() => { if (el.parentElement) { el.style.animation = 'toast-out 0.3s ease forwards'; setTimeout(() => el.remove(), 300); } }, 5000);
+    }
+
+    // ── API helpers ────────────────────────────────────────────────────────
+    async function api(path, opts = {}) {
+      try {
+        const r = await fetch(path, opts);
+        if (!r.ok) {
+          const data = await r.json().catch(() => ({}));
+          throw new Error(data.detail || `HTTP ${r.status}`);
+        }
+        if (r.status === 204) return null;
+        return await r.json();
+      } catch (e) {
+        toast(e.message, 'error');
+        throw e;
+      }
+    }
+
+    // ── Load data ──────────────────────────────────────────────────────────
+    async function loadTags() {
+      allTags = await api('/api/tags');
+      const sel = document.getElementById('filter-tag');
+      sel.innerHTML = '<option value="">All Tags</option>';
+      allTags.forEach(t => {
+        const o = document.createElement('option');
+        o.value = t.name; o.textContent = t.name;
+        sel.appendChild(o);
+      });
+      // Also populate create form tag checkboxes
+      const cc = document.getElementById('create-tags');
+      cc.innerHTML = '';
+      allTags.forEach(t => {
+        const lbl = document.createElement('label');
+        lbl.innerHTML = `<input type="checkbox" value="${t.id}"> ${t.name}`;
+        cc.appendChild(lbl);
+      });
+    }
 
     async function load() {
+      // Health
       try {
         const health = await fetch('/api/health').then(r => r.json());
         document.getElementById('health').textContent = `${health.status} (${health.tasks} tasks)`;
@@ -86,34 +299,257 @@
         document.getElementById('health').className = 'health health--err';
       }
 
-      const tasks = await fetch(`/api/tasks?sort_by=${sortBy}&sort_dir=${sortDir}`).then(r => r.json());
+      // Tasks
+      let url = `/api/tasks?sort_by=${sortBy}&sort_dir=${sortDir}`;
+      if (filterStatus) url += `&status=${filterStatus}`;
+      if (filterTag) url += `&tag=${encodeURIComponent(filterTag)}`;
+      allTasks = await api(url);
+
       const groups = { todo: [], in_progress: [], done: [] };
-      tasks.forEach(t => (groups[t.status] || groups.todo).push(t));
+      allTasks.forEach(t => (groups[t.status] || groups.todo).push(t));
 
       render('todo-list', 'todo-count', groups.todo);
       render('progress-list', 'progress-count', groups.in_progress);
       render('done-list', 'done-count', groups.done);
+
+      // Refresh detail panel if open
+      if (openTaskId) {
+        const t = allTasks.find(t => t.id === openTaskId);
+        if (t) renderPanel(t);
+      }
+    }
+
+    function renderChips(tags, max = 3) {
+      if (!tags || !tags.length) return '';
+      const visible = tags.slice(0, max);
+      const overflow = tags.length - max;
+      let html = visible.map(n =>
+        `<span class="chip" style="background:${chipColor(n)};color:#000">${n}</span>`
+      ).join('');
+      if (overflow > 0) html += `<span class="chip-overflow">+${overflow}</span>`;
+      return html;
     }
 
     function render(listId, countId, tasks) {
       document.getElementById(countId).textContent = tasks.length;
-      document.getElementById(listId).innerHTML = tasks.map(t =>
-        `<div class="task"><span class="task-title">${t.title}</span><span class="task-priority">#${t.priority}</span></div>`
-      ).join('');
+      document.getElementById(listId).innerHTML = tasks.map(t => `
+        <div class="task">
+          <div class="task-left">
+            <span class="task-title" tabindex="0" role="button" aria-label="View details: ${t.title}"
+              onclick="openPanel(${t.id}, this)" onkeydown="if(event.key==='Enter')openPanel(${t.id}, this)">${t.title}</span>
+            ${renderChips(t.tags)}
+          </div>
+          <div class="task-right">
+            <span class="task-priority">#${t.priority}</span>
+            <span id="del-${t.id}">
+              <button class="btn-delete" aria-label="Delete task: ${t.title}"
+                onclick="confirmDelete(${t.id})" onkeydown="if(event.key==='Enter')confirmDelete(${t.id})">&#10005;</button>
+            </span>
+          </div>
+        </div>
+      `).join('');
     }
 
-    document.getElementById('sort-by').addEventListener('change', e => {
-      sortBy = e.target.value;
+    // ── Create form ────────────────────────────────────────────────────────
+    function toggleCreate() {
+      const p = document.getElementById('create-panel');
+      p.classList.toggle('open');
+      if (p.classList.contains('open')) {
+        document.getElementById('new-title').focus();
+      } else {
+        document.getElementById('new-title').value = '';
+        document.getElementById('new-desc').value = '';
+        document.getElementById('new-priority').value = '0';
+        document.getElementById('more-options-body').classList.remove('open');
+        document.querySelectorAll('#create-tags input').forEach(c => c.checked = false);
+      }
+    }
+
+    function toggleMoreOptions() {
+      document.getElementById('more-options-body').classList.toggle('open');
+    }
+
+    async function submitCreate() {
+      const title = document.getElementById('new-title').value.trim();
+      if (!title) { toast('Title is required', 'error'); return; }
+      const body = {
+        title,
+        description: document.getElementById('new-desc').value,
+        priority: parseInt(document.getElementById('new-priority').value) || 0,
+        tag_ids: [...document.querySelectorAll('#create-tags input:checked')].map(c => parseInt(c.value)),
+      };
+      await api('/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      toast('Task created');
+      toggleCreate();
       load();
+    }
+
+    // Keyboard: Enter in title submits, Escape cancels
+    document.getElementById('new-title').addEventListener('keydown', e => {
+      if (e.key === 'Enter' && e.target.value.trim()) submitCreate();
+      if (e.key === 'Escape') toggleCreate();
     });
 
+    // ── Delete with inline confirmation ────────────────────────────────────
+    function confirmDelete(id) {
+      const el = document.getElementById(`del-${id}`);
+      el.innerHTML = `<span class="confirm-inline">
+        <button class="btn-yes" onclick="doDelete(${id})">Yes</button>
+        <button onclick="cancelDelete(${id})">No</button>
+      </span>`;
+      el.querySelector('.btn-yes').focus();
+      setTimeout(() => cancelDelete(id), 3000);
+    }
+
+    function cancelDelete(id) {
+      const el = document.getElementById(`del-${id}`);
+      if (!el) return;
+      const task = allTasks.find(t => t.id === id);
+      if (task) el.innerHTML = `<button class="btn-delete" aria-label="Delete task: ${task.title}" onclick="confirmDelete(${id})">&#10005;</button>`;
+    }
+
+    async function doDelete(id) {
+      await api(`/api/tasks/${id}`, { method: 'DELETE' });
+      toast('Task deleted');
+      if (openTaskId === id) closePanel();
+      load();
+    }
+
+    // ── Detail panel ───────────────────────────────────────────────────────
+    function openPanel(id, triggerEl) {
+      openTaskId = id;
+      lastFocusTrigger = triggerEl || null;
+      const t = allTasks.find(t => t.id === id);
+      if (!t) return;
+      renderPanel(t);
+      document.getElementById('panel-overlay').classList.add('open');
+      document.getElementById('panel-close').focus();
+    }
+
+    function closePanel() {
+      openTaskId = null;
+      document.getElementById('panel-overlay').classList.remove('open');
+      if (lastFocusTrigger) { lastFocusTrigger.focus(); lastFocusTrigger = null; }
+    }
+
+    function renderPanel(t) {
+      const tagsHtml = t.tags.length
+        ? t.tags.map(n => `<span class="chip" style="background:${chipColor(n)};color:#000">${n}</span>`).join('')
+        : '<span style="color:var(--muted)">No tags</span>';
+
+      const tagCheckboxes = allTags.map(tag =>
+        `<label style="font-size:0.8rem;display:flex;align-items:center;gap:4px;cursor:pointer">
+          <input type="checkbox" value="${tag.id}" ${t.tags.includes(tag.name) ? 'checked' : ''}
+            onchange="updateTags(${t.id})">${tag.name}</label>`
+      ).join('');
+
+      document.getElementById('panel-body').innerHTML = `
+        <div class="panel-field">
+          <div class="panel-label">Title</div>
+          <div class="panel-value editable" id="pv-title" tabindex="0"
+            onclick="editField(${t.id},'title','pv-title',this.textContent)"
+            onkeydown="if(event.key==='Enter')editField(${t.id},'title','pv-title',this.textContent)">${t.title}</div>
+        </div>
+        <div class="panel-field">
+          <div class="panel-label">Description</div>
+          <div class="panel-value editable" id="pv-desc" tabindex="0"
+            onclick="editField(${t.id},'description','pv-desc',this.textContent)"
+            onkeydown="if(event.key==='Enter')editField(${t.id},'description','pv-desc',this.textContent)">${t.description || 'No description'}</div>
+        </div>
+        <div class="panel-field">
+          <div class="panel-label">Status</div>
+          <div class="panel-status">
+            <select onchange="updateField(${t.id},'status',this.value)">
+              <option value="todo" ${t.status==='todo'?'selected':''}>To Do</option>
+              <option value="in_progress" ${t.status==='in_progress'?'selected':''}>In Progress</option>
+              <option value="done" ${t.status==='done'?'selected':''}>Done</option>
+            </select>
+          </div>
+        </div>
+        <div class="panel-field">
+          <div class="panel-label">Priority</div>
+          <div class="panel-value editable" id="pv-priority" tabindex="0"
+            onclick="editField(${t.id},'priority','pv-priority',this.textContent)"
+            onkeydown="if(event.key==='Enter')editField(${t.id},'priority','pv-priority',this.textContent)">${t.priority}</div>
+        </div>
+        <div class="panel-field">
+          <div class="panel-label">Tags</div>
+          <div class="panel-tags">${tagsHtml}</div>
+          <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px" id="panel-tag-checkboxes">${tagCheckboxes}</div>
+        </div>
+        <div class="panel-field">
+          <div class="panel-label">Created</div>
+          <div class="panel-timestamp" title="${t.created_at}">${relTime(t.created_at)}</div>
+        </div>
+        <div class="panel-field">
+          <div class="panel-label">Updated</div>
+          <div class="panel-timestamp" title="${t.updated_at}">${relTime(t.updated_at)}</div>
+        </div>
+      `;
+    }
+
+    function editField(id, field, elId, currentVal) {
+      const el = document.getElementById(elId);
+      const isNum = field === 'priority';
+      const inputType = isNum ? 'number' : 'text';
+      const val = currentVal === 'No description' ? '' : currentVal;
+      el.outerHTML = `<input class="panel-input" id="${elId}" type="${inputType}" value="${val}"
+        onkeydown="if(event.key==='Enter')saveField(${id},'${field}','${elId}',this.value);if(event.key==='Escape')load()"
+        onblur="saveField(${id},'${field}','${elId}',this.value)" autofocus>`;
+      document.getElementById(elId).focus();
+    }
+
+    async function saveField(id, field, elId, value) {
+      const body = {};
+      body[field] = field === 'priority' ? parseInt(value) || 0 : value;
+      await api(`/api/tasks/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      load();
+    }
+
+    async function updateField(id, field, value) {
+      const body = {};
+      body[field] = value;
+      await api(`/api/tasks/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      toast(`Status updated`);
+      load();
+    }
+
+    async function updateTags(taskId) {
+      const checked = [...document.querySelectorAll('#panel-tag-checkboxes input:checked')].map(c => parseInt(c.value));
+      await api(`/api/tasks/${taskId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tag_ids: checked }) });
+      load();
+    }
+
+    // Focus trap for detail panel
+    document.getElementById('panel-overlay').addEventListener('keydown', e => {
+      if (e.key === 'Escape') { closePanel(); return; }
+      if (e.key !== 'Tab') return;
+      const panel = document.getElementById('detail-panel');
+      const focusable = panel.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      if (!focusable.length) return;
+      const first = focusable[0], last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    });
+
+    // Close panel on overlay click (not panel itself)
+    document.getElementById('panel-overlay').addEventListener('click', e => {
+      if (e.target === document.getElementById('panel-overlay')) closePanel();
+    });
+    document.getElementById('panel-close').addEventListener('click', closePanel);
+
+    // ── Toolbar event listeners ────────────────────────────────────────────
+    document.getElementById('sort-by').addEventListener('change', e => { sortBy = e.target.value; load(); });
     document.getElementById('sort-dir').addEventListener('click', e => {
       sortDir = sortDir === 'asc' ? 'desc' : 'asc';
-      e.target.textContent = sortDir === 'asc' ? 'Asc ↑' : 'Desc ↓';
+      e.target.textContent = sortDir === 'asc' ? 'Asc \u2191' : 'Desc \u2193';
       load();
     });
+    document.getElementById('filter-status').addEventListener('change', e => { filterStatus = e.target.value; load(); });
+    document.getElementById('filter-tag').addEventListener('change', e => { filterTag = e.target.value; load(); });
 
-    load();
+    // ── Init ───────────────────────────────────────────────────────────────
+    loadTags().then(load);
   </script>
 </body>
 </html>

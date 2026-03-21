@@ -1,4 +1,4 @@
-"""Task CRUD tests — comprehensive coverage for all endpoints."""
+"""Task & Tag CRUD tests — comprehensive coverage for all endpoints."""
 
 import os
 
@@ -258,10 +258,177 @@ def test_delete_already_deleted_returns_404():
     assert r.status_code == 404
 
 
-# ── Tags ──────────────────────────────────────────────────────────────────
+# ── Tags — CRUD ──────────────────────────────────────────────────────────
 
 
 def test_list_tags():
     r = client.get("/api/tags")
     assert r.status_code == 200
     assert isinstance(r.json(), list)
+
+
+def test_create_tag():
+    r = client.post("/api/tags", json={"name": "urgent"})
+    assert r.status_code == 201
+    data = r.json()
+    assert data["name"] == "urgent"
+    assert "id" in data
+
+
+def test_create_duplicate_tag_returns_409():
+    client.post("/api/tags", json={"name": "duplicate-test"})
+    r = client.post("/api/tags", json={"name": "duplicate-test"})
+    assert r.status_code == 409
+
+
+def test_delete_tag():
+    create = client.post("/api/tags", json={"name": "to-delete"})
+    tag_id = create.json()["id"]
+
+    r = client.delete(f"/api/tags/{tag_id}")
+    assert r.status_code == 204
+
+    # Verify it's gone
+    tags = client.get("/api/tags").json()
+    assert not any(t["name"] == "to-delete" for t in tags)
+
+
+# ── Tags — Task-Tag Assignment ───────────────────────────────────────────
+
+
+def test_create_task_with_tags():
+    # Create a tag first
+    tag = client.post("/api/tags", json={"name": "tag-assign-test"}).json()
+
+    r = client.post("/api/tasks", json={
+        "title": "Tagged task",
+        "priority": 1,
+        "tag_ids": [tag["id"]],
+    })
+    assert r.status_code == 201
+    assert "tag-assign-test" in r.json()["tags"]
+
+
+def test_update_task_tags():
+    tag1 = client.post("/api/tags", json={"name": "tag-update-1"}).json()
+    tag2 = client.post("/api/tags", json={"name": "tag-update-2"}).json()
+
+    task = client.post("/api/tasks", json={
+        "title": "Tag update test",
+        "tag_ids": [tag1["id"]],
+    }).json()
+
+    # Replace tags
+    r = client.patch(f"/api/tasks/{task['id']}", json={"tag_ids": [tag2["id"]]})
+    assert r.status_code == 200
+    assert "tag-update-2" in r.json()["tags"]
+    assert "tag-update-1" not in r.json()["tags"]
+
+
+def test_update_task_clear_tags():
+    tag = client.post("/api/tags", json={"name": "tag-clear-test"}).json()
+    task = client.post("/api/tasks", json={
+        "title": "Clear tags test",
+        "tag_ids": [tag["id"]],
+    }).json()
+
+    r = client.patch(f"/api/tasks/{task['id']}", json={"tag_ids": []})
+    assert r.status_code == 200
+    assert r.json()["tags"] == []
+
+
+def test_update_task_without_tag_ids_preserves_tags():
+    tag = client.post("/api/tags", json={"name": "tag-preserve-test"}).json()
+    task = client.post("/api/tasks", json={
+        "title": "Preserve tags test",
+        "tag_ids": [tag["id"]],
+    }).json()
+
+    # Update title only — no tag_ids field
+    r = client.patch(f"/api/tasks/{task['id']}", json={"title": "New title"})
+    assert r.status_code == 200
+    assert "tag-preserve-test" in r.json()["tags"]
+
+
+def test_create_task_with_invalid_tag_ids_ignores_them():
+    r = client.post("/api/tasks", json={
+        "title": "Invalid tag IDs",
+        "tag_ids": [99999, 88888],
+    })
+    assert r.status_code == 201
+    assert r.json()["tags"] == []
+
+
+# ── Tags — Filtering ────────────────────────────────────────────────────
+
+
+def test_list_tasks_filter_by_tag():
+    tag = client.post("/api/tags", json={"name": "filter-tag-test"}).json()
+    client.post("/api/tasks", json={"title": "Has tag", "tag_ids": [tag["id"]]})
+    client.post("/api/tasks", json={"title": "No tag"})
+
+    r = client.get("/api/tasks?tag=filter-tag-test")
+    assert r.status_code == 200
+    titles = [t["title"] for t in r.json()]
+    assert "Has tag" in titles
+    assert "No tag" not in titles
+
+
+def test_list_tasks_filter_by_nonexistent_tag_returns_empty():
+    r = client.get("/api/tasks?tag=nonexistent-tag-xyz")
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+def test_list_tasks_filter_by_tag_and_status():
+    tag = client.post("/api/tags", json={"name": "combo-filter-tag"}).json()
+    task = client.post("/api/tasks", json={
+        "title": "Combo filter",
+        "tag_ids": [tag["id"]],
+    }).json()
+    client.patch(f"/api/tasks/{task['id']}", json={"status": "done"})
+
+    r = client.get("/api/tasks?tag=combo-filter-tag&status=done")
+    assert r.status_code == 200
+    assert len(r.json()) >= 1
+    assert all(t["status"] == "done" for t in r.json())
+
+
+# ── Tags — Cascade Behavior ─────────────────────────────────────────────
+
+
+def test_delete_tag_removes_task_tag_associations():
+    tag = client.post("/api/tags", json={"name": "cascade-tag-test"}).json()
+    task = client.post("/api/tasks", json={
+        "title": "Cascade test",
+        "tag_ids": [tag["id"]],
+    }).json()
+
+    # Delete the tag
+    client.delete(f"/api/tags/{tag['id']}")
+
+    # Task should no longer have the tag
+    r = client.get(f"/api/tasks/{task['id']}")
+    assert "cascade-tag-test" not in r.json()["tags"]
+
+
+def test_delete_task_removes_task_tag_associations():
+    tag = client.post("/api/tags", json={"name": "task-cascade-test"}).json()
+    task = client.post("/api/tasks", json={
+        "title": "Task cascade",
+        "tag_ids": [tag["id"]],
+    }).json()
+
+    client.delete(f"/api/tasks/{task['id']}")
+
+    # Tag should still exist
+    tags = client.get("/api/tags").json()
+    assert any(t["name"] == "task-cascade-test" for t in tags)
+
+
+def test_tags_response_format():
+    r = client.post("/api/tasks", json={"title": "Format check"})
+    assert r.status_code == 201
+    data = r.json()
+    assert "tags" in data
+    assert isinstance(data["tags"], list)
