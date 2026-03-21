@@ -37,7 +37,7 @@ The task board **plus** a governance panel showing the live pipeline state: how 
 7. INBOX shows raw item count
 8. The panel is read-only — no mutations to governance files
 9. All existing 42 tests pass unchanged
-10. 8+ new tests covering the governance API endpoint
+10. 12 new tests covering governance service parsing, edge cases, and API endpoint
 11. No new packages (CLAUDE.md constraint)
 12. Service-first pattern maintained (CLAUDE.md constraint)
 
@@ -59,7 +59,7 @@ All governance files are plain markdown, symlinked into the project root or avai
 
 Simple regex-based extraction — no markdown parser library needed:
 
-- **BACKLOG sections:** Match `## Ideation`, `## Refining`, `## Ready`, `## Done` headers under `# Agentflow Demo`. Count lines starting with `- ` (top-level items only) between section headers.
+- **BACKLOG sections:** Match `## Ideation`, `## Refining`, `## Ready`, `## Done` headers under `# Agentflow Demo`. Count lines matching `^- ` (no leading whitespace) between consecutive `## ` headers. Indented lines (sub-bullets, descriptions) are not counted as separate items.
 - **TODO-Today items:** Match `- [ ]` and `- [x]` patterns. Count each.
 - **DONE-Today entries:** Match `## YYYY-MM-DD` date headers and their content blocks.
 - **INBOX items:** Count lines matching `^- `.
@@ -69,13 +69,34 @@ Simple regex-based extraction — no markdown parser library needed:
 
 BACKLOG.md and TODO-Today.md are cross-project files. The parser SHALL extract only the `# Agentflow Demo` section from BACKLOG.md. For TODO-Today.md, if an `# Agentflow Demo` section exists, parse only that; otherwise return an empty queue with a note that no agentflow items are queued.
 
+### Worked Example — BACKLOG Section Scoping
+
+```
+Given BACKLOG.md contains:
+  # SVG-PAINT
+  ## Ideation
+  - Item A
+  - Item B
+  # Agentflow Demo
+  ## Ideation
+  - Item C
+  - Item D (with nested description)
+    - Sub-bullet (not counted)
+  ## Ready
+  - Item E
+
+Then _parse_backlog() returns:
+  BacklogState(ideation=2, refining=0, ready=1, done=0)
+  (Only Agentflow Demo section parsed. Sub-bullets excluded.)
+```
+
 ---
 
 ## 4. Data Layer
 
 ### 4.1 New Schema: GovernanceState
 
-No database table — this is a read-only view of filesystem state.
+No database table — these are response-only schemas (never persisted). Using SQLModel as base class for consistency with existing codebase, but these are purely Pydantic models.
 
 ```python
 class GovernanceState(SQLModel):
@@ -148,6 +169,8 @@ class GovernanceService:
 - Each parser method is independent and handles missing files gracefully (returns zero/empty, never raises)
 - `get_state()` calls all parsers and assembles the response
 
+**Graceful degradation contract:** If any governance file is missing or its symlink is broken, the corresponding field in GovernanceState returns a zero/empty default. The `autopilot` field returns `"stopped"`. The API SHALL always return 200 — never 500 — regardless of file availability. This ensures the demo works even when cloned without the parent `00_Governance/` directory.
+
 ---
 
 ## 6. Route Layer
@@ -207,8 +230,8 @@ All changes inline in `app/templates/index.html`. No new files, no new packages.
 - Tasks view shows the existing task board (default)
 - Governance view shows the pipeline panel
 - Active tab highlighted with `var(--accent)` underline
-- **Keyboard:** Tab key navigates between tabs, Enter/Space activates
-- **Accessibility:** `role="tablist"`, `role="tab"`, `role="tabpanel"`, `aria-selected`
+- **Keyboard:** Arrow Left/Right moves focus between tabs and activates. Home/End jumps to first/last tab. Tab key moves focus *into* the active tabpanel content, not between tabs.
+- **Accessibility:** `role="tablist"`, `role="tab"`, `role="tabpanel"`, `aria-selected`. Only the active tabpanel has `tabindex="0"`; the hidden one has `hidden` attribute and is removed from the accessibility tree.
 
 ### 7.2 Pipeline Flow Visualization
 
@@ -225,8 +248,8 @@ All changes inline in `app/templates/index.html`. No new files, no new packages.
 ### 7.3 Autopilot Indicator
 
 - Circular indicator next to the pipeline flow (or in the header area)
-- Green pulsing dot for `run`, yellow static dot for `pause`, grey dot for `stopped`
-- Label: "Autopilot: Running" / "Autopilot: Paused" / "Autopilot: Stopped"
+- Green pulsing dot for `run`, yellow static triangle for `pause`, grey static dot for `stopped` (shape + color, not color alone — accessible for color-blind users)
+- Text label is the primary indicator: "Autopilot: Running" / "Autopilot: Paused" / "Autopilot: Stopped". Dot/shape is supplementary.
 - CSS animation for pulsing (respects `prefers-reduced-motion`)
 
 ### 7.4 Queue Monitor (TODO-Today)
@@ -241,14 +264,13 @@ All changes inline in `app/templates/index.html`. No new files, no new packages.
 
 - Card showing recent completions, most recent first
 - Each entry: date badge + title + details (truncated to 2 lines)
-- Max 5 most recent entries displayed, with "View all" link to DONE-Today.md if more
+- Max 5 most recent entries displayed, with "Show more" button that renders additional entries inline if more exist
 - Timestamps use the same relative time format as the task detail panel
 
 ### 7.6 INBOX Preview
 
 - Small card or badge showing inbox item count
-- Click to expand and see the raw items (read-only list)
-- Items displayed as plain text (no parsing of structure within items)
+- Items displayed directly as plain text list (no expand/collapse — inbox items are typically few). If >5 items, show first 5 with a "+N more" truncation.
 
 ### 7.7 Auto-Refresh
 
@@ -279,6 +301,10 @@ All current tests pass unchanged. The governance endpoint reads files, not the d
 - `test_parse_todo_counts_checked_unchecked` — fixture with mixed checkboxes → correct counts
 - `test_read_autopilot_run` — fixture file containing "run" → "run"
 - `test_read_autopilot_missing_returns_stopped` — no file → "stopped"
+
+**Edge case tests (2):**
+- `test_parse_backlog_ignores_other_project_sections` — fixture with SVG-PAINT + KETO + Agentflow sections → only Agentflow counts returned
+- `test_governance_with_missing_files_returns_defaults` — point GovernanceService at empty directory → all fields zero/empty, API returns 200
 
 **API endpoint tests (4):**
 - `test_governance_endpoint_returns_200` — GET /api/governance returns 200
