@@ -1,10 +1,146 @@
 """Service layer — business logic lives here, not in route handlers."""
 
+import os
+import re
 from datetime import UTC, datetime
+from pathlib import Path
 
 from sqlmodel import Session, select
 
-from app.models import Tag, Task, TaskCreate, TaskTag, TaskUpdate
+from app.models import (
+    BacklogState,
+    DoneEntry,
+    GovernanceState,
+    Tag,
+    Task,
+    TaskCreate,
+    TaskTag,
+    TaskUpdate,
+    TodoItem,
+    TodoState,
+)
+
+
+class GovernanceService:
+    """Read-only service parsing governance markdown files into structured state."""
+
+    def __init__(self, base_path: str = "."):
+        self._base = Path(base_path)
+
+    def get_state(self) -> GovernanceState:
+        return GovernanceState(
+            inbox_count=self._parse_inbox(),
+            backlog=self._parse_backlog(),
+            todo=self._parse_todo(),
+            done=self._parse_done(),
+            autopilot=self._read_autopilot(),
+        )
+
+    def _read_file(self, name: str) -> str:
+        """Read a file, returning empty string if missing or broken symlink."""
+        try:
+            return (self._base / name).read_text(encoding="utf-8")
+        except (FileNotFoundError, OSError):
+            return ""
+
+    def _parse_inbox(self) -> int:
+        content = self._read_file("INBOX.md")
+        return len(re.findall(r"^- ", content, re.MULTILINE))
+
+    def _parse_backlog(self) -> BacklogState:
+        content = self._read_file("BACKLOG.md")
+        if not content:
+            return BacklogState()
+
+        # Extract only the "# Agentflow Demo" section
+        match = re.search(
+            r"^# Agentflow Demo\s*\n(.*?)(?=^# |\Z)",
+            content,
+            re.MULTILINE | re.DOTALL,
+        )
+        if not match:
+            return BacklogState()
+
+        section = match.group(1)
+        stages = {"ideation": 0, "refining": 0, "ready": 0, "done": 0}
+
+        current_stage = None
+        for line in section.split("\n"):
+            stage_match = re.match(r"^## (\w+)", line)
+            if stage_match:
+                name = stage_match.group(1).lower()
+                current_stage = name if name in stages else None
+                continue
+            if current_stage and re.match(r"^- ", line):
+                stages[current_stage] += 1
+
+        return BacklogState(**stages)
+
+    def _parse_todo(self) -> TodoState:
+        content = self._read_file("TODO-Today.md")
+        if not content:
+            return TodoState()
+
+        # Try to find Agentflow Demo section
+        match = re.search(
+            r"^# Agentflow Demo\s*\n(.*?)(?=^# |\Z)",
+            content,
+            re.MULTILINE | re.DOTALL,
+        )
+        text = match.group(1) if match else content
+
+        items = []
+        for m in re.finditer(r"^- \[([ x])\] (.+)$", text, re.MULTILINE):
+            items.append(TodoItem(text=m.group(2).strip(), checked=m.group(1) == "x"))
+
+        checked = sum(1 for i in items if i.checked)
+        return TodoState(
+            total=len(items),
+            checked=checked,
+            unchecked=len(items) - checked,
+            items=items,
+        )
+
+    def _parse_done(self) -> list[DoneEntry]:
+        content = self._read_file("DONE-Today.md")
+        if not content:
+            return []
+
+        entries = []
+        current_date = ""
+        current_title = ""
+        current_details: list[str] = []
+
+        for line in content.split("\n"):
+            date_match = re.match(r"^## (\d{4}-\d{2}-\d{2})\s*[—–-]?\s*(.*)", line)
+            if date_match:
+                if current_date and current_title:
+                    entries.append(DoneEntry(
+                        date=current_date,
+                        title=current_title,
+                        details="\n".join(current_details).strip(),
+                    ))
+                current_date = date_match.group(1)
+                current_title = date_match.group(2).strip() or "Completed work"
+                current_details = []
+                continue
+            if current_date and line.strip():
+                current_details.append(line.strip())
+
+        if current_date and current_title:
+            entries.append(DoneEntry(
+                date=current_date,
+                title=current_title,
+                details="\n".join(current_details).strip(),
+            ))
+
+        return entries[:10]  # Most recent entries (file is chronological)
+
+    def _read_autopilot(self) -> str:
+        content = self._read_file(".autopilot").strip().lower()
+        if content in ("run", "pause"):
+            return content
+        return "stopped"
 
 
 class TagService:

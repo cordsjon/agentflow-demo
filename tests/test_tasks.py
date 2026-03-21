@@ -1,11 +1,13 @@
-"""Task & Tag CRUD tests — comprehensive coverage for all endpoints."""
+"""Task, Tag, & Governance tests — comprehensive coverage for all endpoints."""
 
 import os
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine
 
 from app.main import app, get_db
+from app.services import GovernanceService
 
 engine = create_engine("sqlite:///test.db", echo=False)
 
@@ -432,3 +434,99 @@ def test_tags_response_format():
     data = r.json()
     assert "tags" in data
     assert isinstance(data["tags"], list)
+
+
+# ── Governance — Service Unit Tests ──────────────────────────────────────
+
+FIXTURES = str(Path(__file__).parent / "fixtures" / "governance")
+
+
+def test_parse_inbox_counts_items():
+    svc = GovernanceService(base_path=FIXTURES)
+    assert svc._parse_inbox() == 4
+
+
+def test_parse_inbox_missing_file_returns_zero():
+    svc = GovernanceService(base_path="/tmp/nonexistent-gov-path")
+    assert svc._parse_inbox() == 0
+
+
+def test_parse_backlog_extracts_agentflow_section():
+    svc = GovernanceService(base_path=FIXTURES)
+    state = svc._parse_backlog()
+    assert state.ideation == 3
+    assert state.refining == 1
+    assert state.ready == 0
+    assert state.done == 2
+
+
+def test_parse_backlog_ignores_other_project_sections():
+    svc = GovernanceService(base_path=FIXTURES)
+    state = svc._parse_backlog()
+    # SVG-PAINT has 2 ideation + 1 ready, KETO has 1 ideation
+    # None of those should appear in the agentflow result
+    assert state.ideation == 3  # only agentflow's 3
+    assert state.ready == 0  # agentflow ready is empty
+
+
+def test_parse_todo_counts_checked_unchecked():
+    svc = GovernanceService(base_path=FIXTURES)
+    state = svc._parse_todo()
+    assert state.total == 4
+    assert state.checked == 2
+    assert state.unchecked == 2
+
+
+def test_read_autopilot_run():
+    # Create a temp file with "run"
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        Path(td, ".autopilot").write_text("run")
+        svc = GovernanceService(base_path=td)
+        assert svc._read_autopilot() == "run"
+
+
+def test_read_autopilot_missing_returns_stopped():
+    svc = GovernanceService(base_path="/tmp/nonexistent-gov-path")
+    assert svc._read_autopilot() == "stopped"
+
+
+def test_governance_with_missing_files_returns_defaults():
+    svc = GovernanceService(base_path="/tmp/nonexistent-gov-path")
+    state = svc.get_state()
+    assert state.inbox_count == 0
+    assert state.backlog.ideation == 0
+    assert state.todo.total == 0
+    assert state.done == []
+    assert state.autopilot == "stopped"
+
+
+# ── Governance — API Endpoint Tests ──────────────────────────────────────
+
+
+def test_governance_endpoint_returns_200():
+    r = client.get("/api/governance")
+    assert r.status_code == 200
+
+
+def test_governance_response_structure():
+    r = client.get("/api/governance")
+    data = r.json()
+    assert "inbox_count" in data
+    assert "backlog" in data
+    assert "todo" in data
+    assert "done" in data
+    assert "autopilot" in data
+    assert isinstance(data["backlog"], dict)
+    assert "ideation" in data["backlog"]
+
+
+def test_governance_autopilot_status():
+    r = client.get("/api/governance")
+    data = r.json()
+    assert data["autopilot"] in ("run", "pause", "stopped")
+
+
+def test_governance_inbox_count_is_integer():
+    r = client.get("/api/governance")
+    assert isinstance(r.json()["inbox_count"], int)

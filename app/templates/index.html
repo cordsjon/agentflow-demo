@@ -108,6 +108,51 @@
       .toolbar-sep { display: none; }
     }
 
+    /* Tabs */
+    .tablist { display: flex; gap: 0; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border); }
+    .tab { padding: 0.5rem 1.25rem; font-size: 0.9rem; background: none; border: none; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; font-family: inherit; }
+    .tab:hover { color: var(--text); }
+    .tab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+    .tabpanel { display: none; }
+    .tabpanel.active { display: block; }
+
+    /* Governance panel */
+    .gov-pipeline { display: flex; align-items: center; gap: 0; flex-wrap: wrap; margin-bottom: 1.5rem; }
+    .gov-stage { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 1rem; text-align: center; min-width: 80px; }
+    .gov-stage-name { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .gov-stage-count { font-size: 1.5rem; font-weight: 700; }
+    .gov-stage--ready .gov-stage-count { color: var(--green); }
+    .gov-stage--muted .gov-stage-count { color: var(--muted); }
+    .gov-stage--accent .gov-stage-count { color: var(--accent); }
+    .gov-arrow { color: var(--muted); font-size: 1.2rem; padding: 0 0.4rem; }
+    .gov-sub { display: flex; gap: 0.25rem; font-size: 0.7rem; color: var(--muted); margin-top: 2px; justify-content: center; }
+    .gov-sub span { padding: 1px 6px; border-radius: 8px; background: rgba(255,255,255,0.05); }
+
+    .gov-autopilot { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.9rem; border-radius: 16px; font-size: 0.8rem; margin-bottom: 1.5rem; }
+    .gov-autopilot--run { background: rgba(63,185,80,0.15); color: var(--green); }
+    .gov-autopilot--pause { background: rgba(210,169,34,0.15); color: var(--yellow); }
+    .gov-autopilot--stopped { background: rgba(139,148,158,0.1); color: var(--muted); }
+    .gov-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .gov-dot--run { background: var(--green); animation: pulse 2s infinite; }
+    .gov-dot--pause { background: var(--yellow); width: 0; height: 0; border-radius: 0; border-left: 5px solid var(--yellow); border-top: 4px solid transparent; border-bottom: 4px solid transparent; }
+    .gov-dot--stopped { background: var(--muted); }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    @media (prefers-reduced-motion: reduce) { .gov-dot--run { animation: none; } }
+
+    .gov-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+    .gov-item { padding: 0.35rem 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+    .gov-item:last-child { border-bottom: none; }
+    .gov-item--checked { color: var(--muted); text-decoration: line-through; }
+    .gov-date { font-size: 0.7rem; color: var(--muted); margin-right: 0.5rem; }
+    .gov-empty { color: var(--muted); font-size: 0.85rem; font-style: italic; }
+    .gov-refresh { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; font-size: 0.8rem; cursor: pointer; float: right; }
+    .gov-refresh:hover { border-color: var(--accent); }
+
+    @media (max-width: 640px) {
+      .gov-pipeline { flex-direction: column; align-items: stretch; }
+      .gov-arrow { transform: rotate(90deg); text-align: center; padding: 0.2rem 0; }
+    }
+
     .footer { margin-top: 2rem; color: var(--muted); font-size: 0.8rem; }
   </style>
 </head>
@@ -117,6 +162,15 @@
     Minimal task manager for <a href="https://github.com/cordsjon/agentflow">agentflow</a> governance demos
     <span class="health" id="health"></span>
   </p>
+
+  <!-- Tab navigation -->
+  <div class="tablist" role="tablist" aria-label="View selector">
+    <button class="tab" role="tab" id="tab-tasks" aria-selected="true" aria-controls="panel-tasks" tabindex="0">Tasks</button>
+    <button class="tab" role="tab" id="tab-governance" aria-selected="false" aria-controls="panel-governance" tabindex="-1">Governance</button>
+  </div>
+
+  <!-- Tasks tab panel -->
+  <div class="tabpanel active" id="panel-tasks" role="tabpanel" aria-labelledby="tab-tasks">
 
   <!-- Create button -->
   <button class="btn-create" id="btn-new-task" onclick="toggleCreate()">+ New Task</button>
@@ -188,6 +242,40 @@
     <div class="card">
       <h2>Done <span class="badge badge--done" id="done-count">0</span></h2>
       <div id="done-list"></div>
+    </div>
+  </div>
+
+  </div><!-- /panel-tasks -->
+
+  <!-- Governance tab panel -->
+  <div class="tabpanel" id="panel-governance" role="tabpanel" aria-labelledby="tab-governance" hidden>
+    <button class="gov-refresh" onclick="loadGovernance()">Refresh</button>
+    <h2 style="font-size:1rem;margin-bottom:1rem;">Pipeline Overview</h2>
+    <p style="font-size:0.75rem;color:var(--muted);margin-bottom:1rem;">Items flow left-to-right through stages</p>
+
+    <!-- Autopilot indicator -->
+    <div class="gov-autopilot gov-autopilot--stopped" id="gov-autopilot">
+      <span class="gov-dot gov-dot--stopped" id="gov-dot"></span>
+      <span id="gov-autopilot-label">Autopilot: Stopped</span>
+    </div>
+
+    <!-- Pipeline flow -->
+    <div class="gov-pipeline" id="gov-pipeline"></div>
+
+    <!-- Detail cards -->
+    <div class="gov-cards">
+      <div class="card">
+        <h2>TODO Queue</h2>
+        <div id="gov-todo"></div>
+      </div>
+      <div class="card">
+        <h2>Recent Completions</h2>
+        <div id="gov-done"></div>
+      </div>
+      <div class="card">
+        <h2>Inbox</h2>
+        <div id="gov-inbox"></div>
+      </div>
     </div>
   </div>
 
@@ -547,6 +635,120 @@
     });
     document.getElementById('filter-status').addEventListener('change', e => { filterStatus = e.target.value; load(); });
     document.getElementById('filter-tag').addEventListener('change', e => { filterTag = e.target.value; load(); });
+
+    // ── Tab switching ──────────────────────────────────────────────────────
+    const tabs = document.querySelectorAll('[role="tab"]');
+    const panels = document.querySelectorAll('[role="tabpanel"]');
+
+    function switchTab(tabId) {
+      tabs.forEach(t => {
+        const selected = t.id === tabId;
+        t.setAttribute('aria-selected', selected);
+        t.setAttribute('tabindex', selected ? '0' : '-1');
+      });
+      panels.forEach(p => {
+        const active = p.id === 'panel-' + tabId.replace('tab-', '');
+        p.classList.toggle('active', active);
+        if (active) p.removeAttribute('hidden');
+        else p.setAttribute('hidden', '');
+      });
+      if (tabId === 'tab-governance') loadGovernance();
+    }
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => switchTab(tab.id));
+      tab.addEventListener('keydown', e => {
+        const tabArr = [...tabs];
+        const idx = tabArr.indexOf(tab);
+        if (e.key === 'ArrowRight') { e.preventDefault(); const next = tabArr[(idx + 1) % tabArr.length]; next.focus(); switchTab(next.id); }
+        if (e.key === 'ArrowLeft') { e.preventDefault(); const prev = tabArr[(idx - 1 + tabArr.length) % tabArr.length]; prev.focus(); switchTab(prev.id); }
+        if (e.key === 'Home') { e.preventDefault(); tabArr[0].focus(); switchTab(tabArr[0].id); }
+        if (e.key === 'End') { e.preventDefault(); tabArr[tabArr.length-1].focus(); switchTab(tabArr[tabArr.length-1].id); }
+      });
+    });
+
+    // ── Governance ──────────────────────────────────────────────────────────
+    let govPollTimer = null;
+
+    async function loadGovernance() {
+      let data;
+      try { data = await api('/api/governance'); } catch { return; }
+
+      // Autopilot indicator
+      const ap = document.getElementById('gov-autopilot');
+      const dot = document.getElementById('gov-dot');
+      const label = document.getElementById('gov-autopilot-label');
+      ap.className = `gov-autopilot gov-autopilot--${data.autopilot}`;
+      dot.className = `gov-dot gov-dot--${data.autopilot}`;
+      const apLabels = { run: 'Running', pause: 'Paused', stopped: 'Stopped' };
+      label.textContent = `Autopilot: ${apLabels[data.autopilot] || 'Stopped'}`;
+
+      // Pipeline flow
+      const b = data.backlog;
+      document.getElementById('gov-pipeline').innerHTML = `
+        <div class="gov-stage gov-stage--muted">
+          <div class="gov-stage-count">${data.inbox_count}</div>
+          <div class="gov-stage-name">Inbox</div>
+        </div>
+        <span class="gov-arrow">&rarr;</span>
+        <div class="gov-stage">
+          <div class="gov-stage-count gov-stage--accent">${b.ideation + b.refining + b.ready}</div>
+          <div class="gov-stage-name">Backlog</div>
+          <div class="gov-sub">
+            <span>Idea ${b.ideation}</span>
+            <span>Refine ${b.refining}</span>
+            <span style="color:var(--green)">Ready ${b.ready}</span>
+          </div>
+        </div>
+        <span class="gov-arrow">&rarr;</span>
+        <div class="gov-stage">
+          <div class="gov-stage-count ${data.todo.unchecked > 0 ? 'gov-stage--accent' : 'gov-stage--muted'}">${data.todo.checked}/${data.todo.total}</div>
+          <div class="gov-stage-name">TODO</div>
+        </div>
+        <span class="gov-arrow">&rarr;</span>
+        <div class="gov-stage gov-stage--ready">
+          <div class="gov-stage-count">${b.done}</div>
+          <div class="gov-stage-name">Done</div>
+        </div>
+      `;
+
+      // TODO Queue
+      const todoEl = document.getElementById('gov-todo');
+      if (data.todo.items.length === 0) {
+        todoEl.innerHTML = '<div class="gov-empty">No items queued</div>';
+      } else {
+        const pct = data.todo.total ? Math.round(data.todo.checked / data.todo.total * 100) : 0;
+        todoEl.innerHTML = `
+          <div style="margin-bottom:0.5rem;font-size:0.8rem;color:var(--muted)">${data.todo.checked}/${data.todo.total} complete (${pct}%)</div>
+          <div style="height:4px;background:var(--border);border-radius:2px;margin-bottom:0.75rem">
+            <div style="height:100%;width:${pct}%;background:var(--green);border-radius:2px"></div>
+          </div>
+          ${data.todo.items.map(i => `<div class="gov-item ${i.checked?'gov-item--checked':''}">${i.checked?'&#9745;':'&#9744;'} ${i.text}</div>`).join('')}
+        `;
+      }
+
+      // Completions
+      const doneEl = document.getElementById('gov-done');
+      if (data.done.length === 0) {
+        doneEl.innerHTML = '<div class="gov-empty">No completions recorded</div>';
+      } else {
+        const shown = data.done.slice(0, 5);
+        doneEl.innerHTML = shown.map(d => `
+          <div class="gov-item">
+            <span class="gov-date">${d.date}</span>
+            <strong>${d.title}</strong>
+            ${d.details ? `<div style="font-size:0.75rem;color:var(--muted);margin-top:2px">${d.details.substring(0, 120)}${d.details.length > 120 ? '...' : ''}</div>` : ''}
+          </div>
+        `).join('');
+        if (data.done.length > 5) doneEl.innerHTML += `<div style="font-size:0.8rem;color:var(--accent);margin-top:0.5rem">+${data.done.length - 5} more</div>`;
+      }
+
+      // Inbox
+      const inboxEl = document.getElementById('gov-inbox');
+      inboxEl.innerHTML = data.inbox_count === 0
+        ? '<div class="gov-empty">Inbox empty</div>'
+        : `<div style="font-size:0.85rem">${data.inbox_count} item${data.inbox_count !== 1 ? 's' : ''} waiting for triage</div>`;
+    }
 
     // ── Init ───────────────────────────────────────────────────────────────
     loadTags().then(load);

@@ -4,8 +4,17 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from sqlmodel import Session, SQLModel, create_engine, select
 
-from app.models import Tag, TagRead, Task, TaskCreate, TaskRead, TaskTag, TaskUpdate
-from app.services import TagService, TaskService
+from app.models import (
+    GovernanceState,
+    Tag,
+    TagRead,
+    Task,
+    TaskCreate,
+    TaskRead,
+    TaskTag,
+    TaskUpdate,
+)
+from app.services import GovernanceService, TagService, TaskService
 
 engine = create_engine("sqlite:///demo.db", echo=False)
 app = FastAPI(title="agentflow-demo", version="0.2.0")
@@ -120,6 +129,15 @@ def delete_tag(tag_id: int, session: Session = Depends(get_db)):
     svc = TagService(session)
     if not svc.delete_tag(tag_id):
         raise HTTPException(404, "Tag not found")
+
+
+# ── Governance endpoint ──────────────────────────────────────────────────
+
+
+@app.get("/api/governance", response_model=GovernanceState)
+def get_governance():
+    svc = GovernanceService(base_path=".")
+    return svc.get_state()
 
 
 # ── Seed data ────────────────────────────────────────────────────────────

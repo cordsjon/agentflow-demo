@@ -78,3 +78,41 @@ class TaskUpdate(SQLModel):
     status: str | None = None
     priority: int | None = Field(default=None, ge=0)
     tag_ids: list[int] | None = None  # None = don't change, [] = clear all
+
+
+# ── Governance schemas (response-only, no DB tables) ─────────────────────
+
+
+class BacklogState(SQLModel):
+    ideation: int = 0
+    refining: int = 0
+    ready: int = 0
+    done: int = 0
+
+
+class TodoItem(SQLModel):
+    text: str
+    checked: bool
+
+
+class TodoState(SQLModel):
+    total: int = 0
+    checked: int = 0
+    unchecked: int = 0
+    items: list[TodoItem] = []
+
+
+class DoneEntry(SQLModel):
+    date: str
+    title: str
+    details: str = ""
+
+
+class GovernanceState(SQLModel):
+    """Snapshot of governance pipeline state, parsed from markdown files."""
+
+    inbox_count: int = 0
+    backlog: BacklogState = BacklogState()
+    todo: TodoState = TodoState()
+    done: list[DoneEntry] = []
+    autopilot: str = "stopped"  # "run" | "pause" | "stopped"
