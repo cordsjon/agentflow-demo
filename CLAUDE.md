@@ -39,3 +39,6 @@ python -m pytest tests/ -v
 
 - [agentflow](https://github.com/cordsjon/agentflow) — governance framework
 - [Tether](https://github.com/latentcollapse/Tether) — LLM-to-LLM message bus (optional)
+
+## Philosophy
+There are no solutions, only trade-offs.
