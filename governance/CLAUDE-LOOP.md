@@ -36,7 +36,16 @@ Dumb executor with lightweight routing. Reads first unchecked item, routes it, r
 11. If on a feature branch, run `/finishing-a-development-branch` — PR creation, branch cleanup, merge strategy
 12. Move completed item to DONE-Today.md — orchestrator runs **completion cascade**
 13. **CONTEXT SAVE** — run `/session-handoff` to produce HANDOVER.md with git state, modified files, decisions, open questions, and resume checklist. Also call `memory-bank:update_active_context` with current task state, blockers, next step
-14. No more tasks -> write `"Queue complete"` to `.claude-action`, **STOP**
+14. No more tasks -> enter **Lightsout Chain** (see below), then write `"Queue complete"` to `.claude-action`, **STOP**
+
+### Lightsout Chain — End-of-Day Hygiene (SP-5)
+Runs once when the queue is empty (step 14), before final STOP:
+```
+/health                → pipeline snapshot (read-only)
+/backlog-grooming      → archive shipped items, flag stale/orphans (write)
+/session-handoff       → save context for next session (write)
+```
+This chain keeps the backlog clean without human intervention. If `/backlog-grooming --dry-run` finds 0 archive candidates, it skips the write step. The chain is idempotent — running it twice in a day produces no additional changes.
 
 ### Cleanup Sub-Loop — Quality Gate (nested inside Inner Loop)
 Runs after every implementation, before every commit:
