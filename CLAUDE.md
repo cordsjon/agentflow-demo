@@ -10,7 +10,7 @@ Python 3.11+ · FastAPI · SQLModel/SQLite · Uvicorn
 
 - **Service-first:** Business logic in `TaskService`, not route handlers
 - **No new packages** without explicit instruction
-- **Port 8000** for development
+- **Port 9127** (portmgr-assigned). Launch via `scripts/serve.sh` — reads `PORT` env, defaults to 9127.
 
 ## Governance
 
