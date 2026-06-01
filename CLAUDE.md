@@ -10,7 +10,7 @@ Python 3.11+ · FastAPI · SQLModel/SQLite · Uvicorn
 
 - **Service-first:** Business logic in `TaskService`, not route handlers
 - **No new packages** without explicit instruction
-- **Port 8000** for development
+- **Port 9127** (portmgr-assigned). Launch via `scripts/serve.sh` — reads `PORT` env, defaults to 9127.
 
 ## Governance
 
@@ -39,3 +39,6 @@ python -m pytest tests/ -v
 
 - [agentflow](https://github.com/cordsjon/agentflow) — governance framework
 - [Tether](https://github.com/latentcollapse/Tether) — LLM-to-LLM message bus (optional)
+
+## Philosophy
+There are no solutions, only trade-offs.

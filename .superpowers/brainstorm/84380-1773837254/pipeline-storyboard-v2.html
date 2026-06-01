@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Agentflow Pipeline — 10 Scenes</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #08080f; color: #e0e0f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; overflow: hidden; height: 100vh; }
+
+#viewport { width: 100vw; height: 100vh; overflow: hidden; cursor: grab; user-select: none; }
+#viewport.grabbing { cursor: grabbing; }
+#canvas { transform-origin: 0 0; will-change: transform; padding: 50px 60px 100px; }
+
+#zoom-hint { position: fixed; bottom: 14px; right: 20px; font-size: 11px; color: #444; z-index: 100; pointer-events: none; }
+#zoom-controls { position: fixed; bottom: 12px; left: 20px; display: flex; gap: 8px; z-index: 100; }
+#zoom-controls button { background: #14141e; border: 1px solid #2a2a3a; color: #888; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+#zoom-controls button:hover { background: #1e1e2e; color: #fff; }
+
+.page-title { font-size: 24px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+.page-sub { font-size: 13px; color: #555; margin-bottom: 10px; }
+.hero-tag { display: inline-block; background: #1a1020; border: 1px solid #6c2fa0; color: #c084fc; font-size: 11px; padding: 3px 12px; border-radius: 20px; margin-bottom: 32px; }
+
+/* Two-row snake layout */
+.row { display: flex; align-items: flex-start; gap: 0; margin-bottom: 0; }
+.row-spacer { display: flex; justify-content: flex-end; padding-right: 0; margin: 6px 0; }
+.bend-arrow { font-size: 28px; color: #2a2a4a; line-height: 1; padding-right: 12px; padding-top: 2px; }
+
+/* Stage */
+.stage-wrap { display: flex; flex-direction: column; align-items: center; flex: 0 0 170px; }
+.connector { flex: 0 0 28px; display: flex; align-items: flex-start; padding-top: 38px; color: #2a2a4a; font-size: 18px; flex-shrink: 0; }
+.connector.rev { padding-top: 38px; color: #2a2a4a; }
+
+.stage {
+  width: 162px;
+  background: #0e0e1a;
+  border: 1.5px solid #1e1e2e;
+  border-radius: 14px;
+  padding: 16px 14px 12px;
+  position: relative;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.stage:hover { border-color: #4a3a8a; box-shadow: 0 4px 20px rgba(108,99,255,0.12); }
+
+.stage-num { position: absolute; top: -10px; left: 14px; background: #1a1a2e; border: 1.5px solid #2e2e4e; color: #555; font-size: 9px; padding: 1px 7px; border-radius: 10px; font-weight: 700; letter-spacing: 0.5px; }
+.stage-icon { font-size: 22px; margin-bottom: 6px; }
+.stage-name { font-size: 11px; font-weight: 700; color: #fff; margin-bottom: 2px; }
+.stage-gate { font-size: 9px; color: #444; margin-bottom: 8px; font-style: italic; font-family: 'SF Mono', monospace; }
+
+.tools { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
+.tool {
+  display: flex; align-items: center; gap: 5px;
+  background: #12121e; border: 1px solid #1e1e2e;
+  border-radius: 5px; padding: 4px 7px;
+  font-size: 9px; font-family: 'SF Mono', monospace; color: #888;
+}
+.tool.primary   { border-color: #3a1a6a; background: #16102a; color: #c084fc; }
+.tool.secondary { border-color: #1a2a3a; background: #101820; color: #60a5fa; }
+.tool.tdd       { border-color: #1a3020; background: #0e1810; color: #4ade80; }
+.tool.verify    { border-color: #2a2010; background: #1a1208; color: #fb923c; }
+.tool.autopilot { border-color: #1a3a3a; background: #0e1818; color: #22d3ee; }
+.tool.pattern   { border-color: #2a1a1a; background: #1a1010; color: #f87171; }
+
+.output { font-size: 9px; color: #777; background: #0a0a14; border: 1px dashed #1e1e2e; border-radius: 5px; padding: 5px 7px; line-height: 1.5; }
+.output strong { color: #999; display: block; margin-bottom: 2px; font-size: 8px; letter-spacing: 0.5px; text-transform: uppercase; }
+
+.timing { font-size: 9px; color: #333; margin-top: 8px; text-align: right; font-family: monospace; }
+
+/* Color accents per stage */
+.s-inbox    { border-color: #1e2030 !important; }
+.s-triage   { border-color: #1e2040 !important; }
+.s-biz      { border-color: #2a1a4a !important; }
+.s-brain    { border-color: #1a2a4a !important; }
+.s-spec     { border-color: #2a1a5a !important; }
+.s-tdd      { border-color: #1a3a1a !important; }
+.s-verify   { border-color: #2a2010 !important; }
+.s-done     { border-color: #1a4a1a !important; }
+.s-auto     { border-color: #0a3a3a !important; }
+.s-patterns { border-color: #3a1a1a !important; }
+
+/* Total bar */
+.total-bar { margin-top: 22px; background: #0e0e1a; border: 1px solid #1e1e2e; border-radius: 10px; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.total-bar .label { font-size: 11px; color: #555; white-space: nowrap; }
+.total-bar .value { font-size: 14px; color: #c084fc; font-weight: 700; white-space: nowrap; }
+.progress-segs { display: flex; height: 5px; border-radius: 3px; overflow: hidden; gap: 1px; flex: 1; }
+.seg { height: 100%; border-radius: 1px; }
+
+.legend { display: flex; gap: 16px; margin-top: 14px; flex-wrap: wrap; }
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #444; }
+.legend-dot { width: 8px; height: 8px; border-radius: 2px; }
+</style>
+</head>
+<body>
+<div id="viewport">
+<div id="canvas">
+
+  <div class="hero-tag">🎬 2–3 min · Cinematic · Hero: US-DM-05</div>
+  <div class="page-title">Agentflow Pipeline — 10 Scenes</div>
+  <div class="page-sub">"Health endpoint returns 200 when DB is missing" — raw INBOX note → shipped fix → codified pattern</div>
+
+  <!-- ROW 1: Scenes 01–05 (left to right) -->
+  <div class="row">
+
+    <div class="stage-wrap">
+      <div class="stage s-inbox">
+        <div class="stage-num">01</div>
+        <div class="stage-icon">📥</div>
+        <div class="stage-name">INBOX</div>
+        <div class="stage-gate">raw signal</div>
+        <div class="tools">
+          <div class="tool secondary">📝 Raw note dumped</div>
+        </div>
+        <div class="output"><strong>Artefact</strong>"health returns 200<br>when DB missing"</div>
+        <div class="timing">0:00–0:18</div>
+      </div>
+    </div>
+    <div class="connector">→</div>
+
+    <div class="stage-wrap">
+      <div class="stage s-triage">
+        <div class="stage-num">02</div>
+        <div class="stage-icon">🔍</div>
+        <div class="stage-name">TRIAGE</div>
+        <div class="stage-gate">/sh:triage</div>
+        <div class="tools">
+          <div class="tool primary">⚡ /sh:triage</div>
+          <div class="tool secondary">🏷 Classify → Bug</div>
+        </div>
+        <div class="output"><strong>Artefact</strong>→ BACKLOG / Ideation</div>
+        <div class="timing">0:18–0:35</div>
+      </div>
+    </div>
+    <div class="connector">→</div>
+
+    <div class="stage-wrap">
+      <div class="stage s-biz">
+        <div class="stage-num">03</div>
+        <div class="stage-icon">📊</div>
+        <div class="stage-name">BUSINESS PANEL</div>
+        <div class="stage-gate">/sh:business-panel</div>
+        <div class="tools">
+          <div class="tool primary">📊 /sh:business-panel</div>
+          <div class="tool secondary">⚖️ Impact · Risk</div>
+          <div class="tool secondary">🎯 MoSCoW → Must</div>
+        </div>
+        <div class="output"><strong>Artefact</strong>P1 · Silent failure</div>
+        <div class="timing">0:35–0:58</div>
+      </div>
+    </div>
+    <div class="connector">→</div>
+
+    <div class="stage-wrap">
+      <div class="stage s-brain">
+        <div class="stage-num">04</div>
+        <div class="stage-icon">🧠</div>
+        <div class="stage-name">BRAINSTORM</div>
+        <div class="stage-gate">/sh:brainstorm</div>
+        <div class="tools">
+          <div class="tool primary">🧠 /sh:brainstorm</div>
+          <div class="tool secondary">📐 /sh:design</div>
+          <div class="tool secondary">📋 Spec drafted</div>
+        </div>
+        <div class="output"><strong>Artefact</strong>AC written · → Refining</div>
+        <div class="timing">0:58–1:18</div>
+      </div>
+    </div>
+    <div class="connector">→</div>
+
+    <div class="stage-wrap">
+      <div class="stage s-spec">
+        <div class="stage-num">05</div>
+        <div class="stage-icon">🔬</div>
+        <div class="stage-name">SPEC PANEL</div>
+        <div class="stage-gate">score ≥ 7.0 → Ready</div>
+        <div class="tools">
+          <div class="tool primary">🔬 /sh:spec-panel</div>
+          <div class="tool secondary">✅ DOR check</div>
+          <div class="tool secondary">🏁 Score 8.2 → Ready</div>
+        </div>
+        <div class="output"><strong>Artefact</strong>US-DM-05 → Ready</div>
+        <div class="timing">1:18–1:40</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- BEND connector -->
+  <div class="row-spacer">
+    <div class="bend-arrow">↙</div>
+  </div>
+
+  <!-- ROW 2: Scenes 06–10 (right to left) -->
+  <div class="row" style="flex-direction: row-reverse;">
+
+    <div class="stage-wrap">
+      <div class="stage s-tdd">
+        <div class="stage-num">06</div>
+        <div class="stage-icon">🧪</div>
+        <div class="stage-name">TDD LOOP</div>
+        <div class="stage-gate">/sh:tdd</div>
+        <div class="tools">
+          <div class="tool tdd">🔴 Failing test</div>
+          <div class="tool tdd">🟢 Minimal fix</div>
+          <div class="tool tdd">♻️ Refactor</div>
+        </div>
+        <div class="output"><strong>Artefact</strong>test_503_db_missing<br>passing ✓</div>
+        <div class="timing">1:40–2:02</div>
+      </div>
+    </div>
+    <div class="connector rev">←</div>
+
+    <div class="stage-wrap">
+      <div class="stage s-verify">
+        <div class="stage-num">07</div>
+        <div class="stage-icon">🛡️</div>
+        <div class="stage-name">VERIFY + REVIEW</div>
+        <div class="stage-gate">/sh:verify · /sh:review</div>
+        <div class="tools">
+          <div class="tool verify">🛡️ /sh:verify</div>
+          <div class="tool verify">👁 /sh:review</div>
+          <div class="tool verify">✅ DOD check</div>
+        </div>
+        <div class="output"><strong>Artefact</strong>All gates pass</div>
+        <div class="timing">2:02–2:22</div>
+      </div>
+    </div>
+    <div class="connector rev">←</div>
+
+    <div class="stage-wrap">
+      <div class="stage s-done">
+        <div class="stage-num">08</div>
+        <div class="stage-icon">🚀</div>
+        <div class="stage-name">SHIPPED</div>
+        <div class="stage-gate">/sh:finish</div>
+        <div class="tools">
+          <div class="tool tdd">📦 /sh:finish</div>
+          <div class="tool tdd">✅ DONE-Today</div>
+          <div class="tool tdd">🎉 Commit · archive</div>
+        </div>
+        <div class="output"><strong>Artefact</strong>503 on DB failure.<br>Bug closed.</div>
+        <div class="timing">2:22–2:38</div>
+      </div>
+    </div>
+    <div class="connector rev">←</div>
+
+    <div class="stage-wrap">
+      <div class="stage s-auto">
+        <div class="stage-num">09</div>
+        <div class="stage-icon">🤖</div>
+        <div class="stage-name">AUTOPILOT</div>
+        <div class="stage-gate">.autopilot → run</div>
+        <div class="tools">
+          <div class="tool autopilot">🔁 Loop resumes</div>
+          <div class="tool autopilot">📋 Next item picked</div>
+          <div class="tool autopilot">⚡ No human needed</div>
+        </div>
+        <div class="output"><strong>Artefact</strong>Queue advances.<br>Cycle continues.</div>
+        <div class="timing">2:38–2:50</div>
+      </div>
+    </div>
+    <div class="connector rev">←</div>
+
+    <div class="stage-wrap">
+      <div class="stage s-patterns">
+        <div class="stage-num">10</div>
+        <div class="stage-icon">📚</div>
+        <div class="stage-name">KNOWN PATTERNS</div>
+        <div class="stage-gate">codify the lesson</div>
+        <div class="tools">
+          <div class="tool pattern">📚 KNOWN_PATTERNS.md</div>
+          <div class="tool pattern">🔖 Pattern #12 added</div>
+          <div class="tool pattern">🛡 Future-proof</div>
+        </div>
+        <div class="output"><strong>Artefact</strong>"Health endpoint must<br>return 503 on failure"</div>
+        <div class="timing">2:50–3:00</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Total bar -->
+  <div class="total-bar">
+    <div>
+      <div class="label">Total runtime</div>
+      <div class="value">~3:00</div>
+    </div>
+    <div class="progress-segs">
+      <div class="seg" style="flex:18;background:#2a2a4a"></div>
+      <div class="seg" style="flex:17;background:#2a2a5a"></div>
+      <div class="seg" style="flex:23;background:#3a1a5a"></div>
+      <div class="seg" style="flex:20;background:#1a2a5a"></div>
+      <div class="seg" style="flex:22;background:#2a1a5a"></div>
+      <div class="seg" style="flex:22;background:#1a3a1a"></div>
+      <div class="seg" style="flex:20;background:#3a2a10"></div>
+      <div class="seg" style="flex:16;background:#1a4a1a"></div>
+      <div class="seg" style="flex:12;background:#0a3a3a"></div>
+      <div class="seg" style="flex:10;background:#3a1a1a"></div>
+    </div>
+    <div class="label">10 scenes · 3 gate checks · 1 hero bug · 1 codified pattern</div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#3a1a5a"></div>Business/strategy</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#1a2a5a"></div>Design/spec</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#1a3a1a"></div>TDD/implementation</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#3a2a10"></div>Verification/gates</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#0a3a3a"></div>Autopilot loop</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#3a1a1a"></div>Knowledge capture</div>
+  </div>
+
+</div>
+</div>
+
+<div id="zoom-controls">
+  <button onclick="resetZoom()">⌖ Reset</button>
+  <button onclick="zoomBy(-0.1)">−</button>
+  <button onclick="zoomBy(0.1)">+</button>
+</div>
+<div id="zoom-hint">scroll to zoom · drag to pan</div>
+
+<script>
+let scale = 0.78, tx = 10, ty = 10;
+let dragging = false, startX, startY, startTx, startTy;
+const vp = document.getElementById('viewport');
+const canvas = document.getElementById('canvas');
+function applyTransform() { canvas.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`; }
+applyTransform();
+vp.addEventListener('wheel', e => {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? -0.07 : 0.07;
+  const rect = vp.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const ns = Math.max(0.2, Math.min(3, scale + delta));
+  tx = mx - (mx - tx) * (ns / scale);
+  ty = my - (my - ty) * (ns / scale);
+  scale = ns; applyTransform();
+}, { passive: false });
+vp.addEventListener('mousedown', e => { if (e.target.closest('button')) return; dragging = true; startX = e.clientX; startY = e.clientY; startTx = tx; startTy = ty; vp.classList.add('grabbing'); });
+window.addEventListener('mousemove', e => { if (!dragging) return; tx = startTx + e.clientX - startX; ty = startTy + e.clientY - startY; applyTransform(); });
+window.addEventListener('mouseup', () => { dragging = false; vp.classList.remove('grabbing'); });
+function zoomBy(d) { scale = Math.max(0.2, Math.min(3, scale + d)); applyTransform(); }
+function resetZoom() { scale = 0.78; tx = 10; ty = 10; applyTransform(); }
+</script>
+</body>
+</html>

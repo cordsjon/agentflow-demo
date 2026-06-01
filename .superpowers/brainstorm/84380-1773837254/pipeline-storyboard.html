@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Agentflow Pipeline — Scene Breakdown</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #08080f; color: #e0e0f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; overflow: hidden; height: 100vh; }
+
+#viewport { width: 100vw; height: 100vh; overflow: hidden; cursor: grab; user-select: none; }
+#viewport.grabbing { cursor: grabbing; }
+#canvas { transform-origin: 0 0; will-change: transform; padding: 50px 60px 120px; min-width: 1400px; }
+
+#zoom-hint { position: fixed; bottom: 14px; right: 20px; font-size: 11px; color: #444; z-index: 100; pointer-events: none; }
+#zoom-controls { position: fixed; bottom: 12px; left: 20px; display: flex; gap: 8px; z-index: 100; }
+#zoom-controls button { background: #14141e; border: 1px solid #2a2a3a; color: #888; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+#zoom-controls button:hover { background: #1e1e2e; color: #fff; }
+
+/* Header */
+.page-title { font-size: 24px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+.page-sub { font-size: 13px; color: #555; margin-bottom: 36px; }
+.hero-tag { display: inline-block; background: #1a1020; border: 1px solid #6c2fa0; color: #c084fc; font-size: 11px; padding: 3px 12px; border-radius: 20px; margin-bottom: 8px; }
+
+/* Timeline connector */
+.pipeline { display: flex; align-items: flex-start; gap: 0; }
+.stage-wrap { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 155px; max-width: 190px; }
+.connector { flex: 0 0 32px; display: flex; align-items: flex-start; padding-top: 42px; color: #2a2a4a; font-size: 20px; flex-shrink: 0; }
+
+/* Stage card */
+.stage {
+  width: 100%;
+  background: #0e0e1a;
+  border: 1.5px solid #1e1e2e;
+  border-radius: 14px;
+  padding: 18px 16px 14px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  position: relative;
+}
+.stage:hover { border-color: #4a3a8a; box-shadow: 0 4px 24px rgba(108,99,255,0.12); }
+
+.stage-num { position: absolute; top: -11px; left: 16px; background: #1a1a2e; border: 1.5px solid #2e2e4e; color: #666; font-size: 10px; padding: 1px 8px; border-radius: 10px; font-weight: 600; }
+.stage-icon { font-size: 26px; margin-bottom: 8px; }
+.stage-name { font-size: 12px; font-weight: 700; color: #fff; margin-bottom: 2px; letter-spacing: 0.3px; }
+.stage-gate { font-size: 10px; color: #555; margin-bottom: 10px; font-style: italic; }
+
+/* Tools */
+.tools { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.tool {
+  display: flex; align-items: center; gap: 6px;
+  background: #12121e; border: 1px solid #222;
+  border-radius: 6px; padding: 5px 8px;
+  font-size: 10px; font-family: 'SF Mono', monospace;
+  color: #a0a0c0;
+}
+.tool .tool-icon { font-size: 11px; flex-shrink: 0; }
+.tool.primary { border-color: #3a2a6a; background: #16102a; color: #c084fc; }
+.tool.secondary { border-color: #1a2a3a; background: #101820; color: #60a5fa; }
+.tool.tdd { border-color: #1a3020; background: #101a12; color: #4ade80; }
+.tool.verify { border-color: #2a2010; background: #1a1208; color: #fb923c; }
+
+/* Output badge */
+.output { font-size: 10px; color: #888; background: #0c0c16; border: 1px dashed #222; border-radius: 6px; padding: 5px 8px; line-height: 1.5; }
+.output strong { color: #aaa; display: block; margin-bottom: 2px; font-size: 9px; letter-spacing: 0.5px; text-transform: uppercase; }
+
+/* Scene timing */
+.timing { font-size: 10px; color: #3a3a5a; margin-top: 10px; text-align: right; }
+
+/* Color variants per stage */
+.stage.s1 { border-color: #1e1e30; } .stage.s1 .stage-icon { filter: hue-rotate(0deg); }
+.stage.s2 { border-color: #1e1e30; }
+.stage.s3 { border-color: #2a1a4a; }
+.stage.s4 { border-color: #1a2a4a; }
+.stage.s5 { border-color: #2a1a4a; }
+.stage.s6 { border-color: #1a3020; }
+.stage.s7 { border-color: #2a2010; }
+.stage.s8 { border-color: #1a3a1a; }
+
+/* Legend */
+.legend { display: flex; gap: 16px; margin-top: 28px; flex-wrap: wrap; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #555; }
+.legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+
+/* Total bar */
+.total-bar { margin-top: 28px; background: #0e0e1a; border: 1px solid #1e1e2e; border-radius: 10px; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; }
+.total-bar .label { font-size: 12px; color: #666; }
+.total-bar .value { font-size: 13px; color: #c084fc; font-weight: 600; }
+.total-bar .duration { font-size: 12px; color: #888; }
+.progress-segs { display: flex; height: 6px; border-radius: 3px; overflow: hidden; gap: 1px; flex: 1; margin: 0 20px; }
+.seg { height: 100%; border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div id="viewport">
+<div id="canvas">
+
+  <div class="hero-tag">🎬 2–3 min · Cinematic · Hero: US-DM-05</div>
+  <div class="page-title">Agentflow Pipeline — Scene Breakdown</div>
+  <div class="page-sub">"Health endpoint returns 200 when DB is missing" — from raw INBOX note to shipped code</div>
+
+  <div class="pipeline">
+
+    <!-- STAGE 1: INBOX -->
+    <div class="stage-wrap">
+      <div class="stage s1">
+        <div class="stage-num">01</div>
+        <div class="stage-icon">📥</div>
+        <div class="stage-name">INBOX</div>
+        <div class="stage-gate">Raw signal arrives</div>
+        <div class="tools">
+          <div class="tool secondary"><span class="tool-icon">📝</span> Raw note dumped</div>
+        </div>
+        <div class="output"><strong>Artefact</strong>INBOX.md line:<br>"health returns 200 when DB missing"</div>
+        <div class="timing">0:00 – 0:18</div>
+      </div>
+    </div>
+    <div class="connector">→</div>
+
+    <!-- STAGE 2: TRIAGE -->
+    <div class="stage-wrap">
+      <div class="stage s2">
+        <div class="stage-num">02</div>
+        <div class="stage-icon">🔍</div>
+        <div class="stage-name">TRIAGE</div>
+        <div class="stage-gate">/sh:triage</div>
+        <div class="tools">
+          <div class="tool primary"><span class="tool-icon">⚡</span>/sh:triage</div>
+          <div class="tool secondary"><span class="tool-icon">🏷</span> Classify → Bug</div>
+        </div>
+        <div class="output"><strong>Artefact</strong>Moved to<br>BACKLOG / Ideation</div>
+        <div class="timing">0:18 – 0:38</div>
+      </div>
+    </div>
+    <div class="connector">→</div>
+
+    <!-- STAGE 3: BUSINESS PANEL -->
+    <div class="stage-wrap">
+      <div class="stage s3">
+        <div class="stage-num">03</div>
+        <div class="stage-icon">📊</div>
+        <div class="stage-name">BUSINESS PANEL</div>
+        <div class="stage-gate">/sh:business-panel</div>
+        <div class="tools">
+          <div class="tool primary"><span class="tool-icon">📊</span>/sh:business-panel</div>
+          <div class="tool secondary"><span class="tool-icon">⚖️</span>Impact · Risk · Priority</div>
+          <div class="tool secondary"><span class="tool-icon">🎯</span>MoSCoW → Must Have</div>
+        </div>
+        <div class="output"><strong>Artefact</strong>Priority: P1<br>Severity: Silent failure</div>
+        <div class="timing">0:38 – 1:02</div>
+      </div>
+    </div>
+    <div class="connector">→</div>
+
+    <!-- STAGE 4: BRAINSTORM + SPEC -->
+    <div class="stage-wrap">
+      <div class="stage s4">
+        <div class="stage-num">04</div>
+        <div class="stage-icon">🧠</div>
+        <div class="stage-name">BRAINSTORM</div>
+        <div class="stage-gate">/sh:brainstorm</div>
+        <div class="tools">
+          <div class="tool primary"><span class="tool-icon">🧠</span>/sh:brainstorm</div>
+          <div class="tool secondary"><span class="tool-icon">📐</span>/sh:design</div>
+          <div class="tool secondary"><span class="tool-icon">📋</span>Spec drafted</div>
+        </div>
+        <div class="output"><strong>Artefact</strong>AC written, arch decided,<br>moved → Refining</div>
+        <div class="timing">1:02 – 1:22</div>
+      </div>
+    </div>
+    <div class="connector">→</div>
+
+    <!-- STAGE 5: SPEC PANEL -->
+    <div class="stage-wrap">
+      <div class="stage s5">
+        <div class="stage-num">05</div>
+        <div class="stage-icon">🔬</div>
+        <div class="stage-name">SPEC PANEL</div>
+        <div class="stage-gate">Score ≥ 7.0 → Ready</div>
+        <div class="tools">
+          <div class="tool primary"><span class="tool-icon">🔬</span>/sh:spec-panel</div>
+          <div class="tool secondary"><span class="tool-icon">✅</span>DOR check</div>
+          <div class="tool secondary"><span class="tool-icon">🏁</span>Score: 8.2 → Ready</div>
+        </div>
+        <div class="output"><strong>Artefact</strong>US-DM-05 promoted<br>to BACKLOG / Ready</div>
+        <div class="timing">1:22 – 1:45</div>
+      </div>
+    </div>
+    <div class="connector">→</div>
+
+    <!-- STAGE 6: TDD LOOP -->
+    <div class="stage-wrap">
+      <div class="stage s6">
+        <div class="stage-num">06</div>
+        <div class="stage-icon">🧪</div>
+        <div class="stage-name">TDD LOOP</div>
+        <div class="stage-gate">/sh:tdd</div>
+        <div class="tools">
+          <div class="tool tdd"><span class="tool-icon">🔴</span>Write failing test</div>
+          <div class="tool tdd"><span class="tool-icon">🟢</span>Minimal fix</div>
+          <div class="tool tdd"><span class="tool-icon">♻️</span>Refactor</div>
+        </div>
+        <div class="output"><strong>Artefact</strong>test_health_db_missing<br>_returns_503 — passing</div>
+        <div class="timing">1:45 – 2:10</div>
+      </div>
+    </div>
+    <div class="connector">→</div>
+
+    <!-- STAGE 7: VERIFY + REVIEW -->
+    <div class="stage-wrap">
+      <div class="stage s7">
+        <div class="stage-num">07</div>
+        <div class="stage-icon">🛡️</div>
+        <div class="stage-name">VERIFY + REVIEW</div>
+        <div class="stage-gate">/sh:verify · /sh:review</div>
+        <div class="tools">
+          <div class="tool verify"><span class="tool-icon">🛡️</span>/sh:verify</div>
+          <div class="tool verify"><span class="tool-icon">👁</span>/sh:review</div>
+          <div class="tool verify"><span class="tool-icon">✅</span>DOD check</div>
+        </div>
+        <div class="output"><strong>Artefact</strong>All gates pass<br>Ready to ship</div>
+        <div class="timing">2:10 – 2:32</div>
+      </div>
+    </div>
+    <div class="connector">→</div>
+
+    <!-- STAGE 8: DONE -->
+    <div class="stage-wrap">
+      <div class="stage s8">
+        <div class="stage-num">08</div>
+        <div class="stage-icon">🚀</div>
+        <div class="stage-name">SHIPPED</div>
+        <div class="stage-gate">/sh:finish · DONE-Today</div>
+        <div class="tools">
+          <div class="tool tdd"><span class="tool-icon">📦</span>/sh:finish</div>
+          <div class="tool tdd"><span class="tool-icon">✅</span>DONE-Today logged</div>
+          <div class="tool tdd"><span class="tool-icon">🎉</span>Commit + archive</div>
+        </div>
+        <div class="output"><strong>Artefact</strong>503 on DB failure.<br>Silent bug — closed.</div>
+        <div class="timing">2:32 – 2:50</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Progress bar summary -->
+  <div class="total-bar">
+    <div>
+      <div class="label">Total duration</div>
+      <div class="value">~2:50</div>
+    </div>
+    <div class="progress-segs">
+      <div class="seg" style="flex:18;background:#2a2a4a" title="INBOX"></div>
+      <div class="seg" style="flex:20;background:#2a2a5a" title="TRIAGE"></div>
+      <div class="seg" style="flex:24;background:#3a1a5a" title="BUSINESS PANEL"></div>
+      <div class="seg" style="flex:20;background:#1a2a5a" title="BRAINSTORM"></div>
+      <div class="seg" style="flex:23;background:#2a1a5a" title="SPEC PANEL"></div>
+      <div class="seg" style="flex:25;background:#1a3a1a" title="TDD"></div>
+      <div class="seg" style="flex:22;background:#3a2a1a" title="VERIFY"></div>
+      <div class="seg" style="flex:18;background:#1a4a1a" title="DONE"></div>
+    </div>
+    <div class="duration">8 scenes · 3 gate checks · 1 hero bug</div>
+  </div>
+
+  <!-- Legend -->
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#3a2a6a"></div> Agentflow orchestration</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#1a2a4a"></div> Analysis / design</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#1a3020"></div> TDD / implementation</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#2a2010"></div> Verification / gates</div>
+  </div>
+
+</div>
+</div>
+
+<div id="zoom-controls">
+  <button onclick="resetZoom()">⌖ Reset</button>
+  <button onclick="zoomBy(-0.12)">−</button>
+  <button onclick="zoomBy(0.12)">+</button>
+</div>
+<div id="zoom-hint">scroll to zoom · drag to pan</div>
+
+<script>
+let scale = 0.72, tx = 0, ty = 20;
+let dragging = false, startX, startY, startTx, startTy;
+const vp = document.getElementById('viewport');
+const canvas = document.getElementById('canvas');
+function applyTransform() { canvas.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`; }
+applyTransform();
+vp.addEventListener('wheel', e => {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? -0.07 : 0.07;
+  const rect = vp.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const ns = Math.max(0.2, Math.min(3, scale + delta));
+  tx = mx - (mx - tx) * (ns / scale);
+  ty = my - (my - ty) * (ns / scale);
+  scale = ns; applyTransform();
+}, { passive: false });
+vp.addEventListener('mousedown', e => { if (e.target.closest('button')) return; dragging = true; startX = e.clientX; startY = e.clientY; startTx = tx; startTy = ty; vp.classList.add('grabbing'); });
+window.addEventListener('mousemove', e => { if (!dragging) return; tx = startTx + e.clientX - startX; ty = startTy + e.clientY - startY; applyTransform(); });
+window.addEventListener('mouseup', () => { dragging = false; vp.classList.remove('grabbing'); });
+function zoomBy(d) { scale = Math.max(0.2, Math.min(3, scale + d)); applyTransform(); }
+function resetZoom() { scale = 0.72; tx = 0; ty = 20; applyTransform(); }
+</script>
+</body>
+</html>

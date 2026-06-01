@@ -1,0 +1,4 @@
+[submodule "agentflow"]
+	path = agentflow
+	url = https://github.com/cordsjon/agentflow.git
+	ignore = all
