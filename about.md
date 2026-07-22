@@ -3,7 +3,7 @@ schema_version: 1
 app:
   name: "agentflow-demo"
   owners: ['@cto']
-  repo: "/Users/jcords-macmini/projects/10_agentflow-demo"
+  repo: "/Users/jc-folder/projects/10_agentflow-demo"
   envs: ['dev']
 about_last_reviewed: "2026-05-18"
 about_review_cadence_days: 60

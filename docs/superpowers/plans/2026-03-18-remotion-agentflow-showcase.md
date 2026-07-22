@@ -44,7 +44,7 @@
 - [ ] **Step 1: Scaffold from Remotion's official template**
 
 ```bash
-cd /Users/jcords-macmini/projects/10_agentflow-demo
+cd /Users/jc-folder/projects/10_agentflow-demo
 npm init video -- --blank remotion-video
 ```
 
